@@ -1,0 +1,128 @@
+{
+  "name": "Procesador de Numeros V4 (Flujo Avanzado - Corregido)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "procesar-numeros",
+        "responseMode": "lastNode",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Access-Control-Allow-Methods",
+                "value": "POST, OPTIONS"
+              },
+              {
+                "name": "Access-Control-Allow-Headers",
+                "value": "Content-Type"
+              }
+            ]
+          }
+        }
+      },
+      "id": "webhook-post",
+      "name": "Webhook POST",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "procesar-numeros-id"
+    },
+    {
+      "parameters": {
+        "httpMethod": "OPTIONS",
+        "path": "procesar-numeros",
+        "responseMode": "onReceived",
+        "responseCode": 204,
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Access-Control-Allow-Methods",
+                "value": "POST, OPTIONS"
+              },
+              {
+                "name": "Access-Control-Allow-Headers",
+                "value": "Content-Type"
+              }
+            ]
+          }
+        }
+      },
+      "id": "webhook-options",
+      "name": "Webhook OPTIONS (CORS)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        0,
+        100
+      ],
+      "webhookId": "procesar-numeros-options-id"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.item.json.body || $input.item.json;\nconst text = body.text || '';\n\nlet normalizedText = text.replace(/(\\d)\\.(\\d{3})/g, '$1$2');\nnormalizedText = normalizedText.replace(/(\\d),(\\d)/g, '$1.$2');\n\nconst regex = /-?\\d+(\\.\\d+)?([eE][-+]?\\d+)?/g;\nconst matches = normalizedText.match(regex);\n\nif (!matches || matches.length === 0) {\n  return [{ json: { error: 'No se detectaron números válidos.' } }];\n}\n\n// IMPORTANTE: Devolvemos un solo objeto con arrays para evitar que n8n ejecute los siguientes nodos N veces por separado\nconst numbers = matches.map(Number);\n\nreturn {\n  json: {\n    todos: numbers,\n    positivos: numbers.filter(n => n >= 0),\n    negativos: numbers.filter(n => n < 0)\n  }\n};"
+      },
+      "id": "node-extract",
+      "name": "1. Extracción y Clasificación",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.item.json;\n\nif (data.error) return { json: data };\n\nconst positivos = data.positivos || [];\nconst negativos = data.negativos || [];\nconst todos = data.todos || [];\n\n// Cálculos\nconst cantidad = todos.length;\nconst suma = todos.reduce((a, b) => a + b, 0);\nconst promedio = cantidad > 0 ? suma / cantidad : 0;\n\n// Mediana\nconst sorted = [...todos].sort((a, b) => a - b);\nconst mid = Math.floor(cantidad / 2);\nconst mediana = cantidad % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;\n\n// Desviación\nconst varianza = todos.reduce((a, b) => a + Math.pow(b - promedio, 2), 0) / cantidad;\nconst desviacion = Math.sqrt(varianza);\n\n// Frecuencias\nconst frecuencias = {};\ntodos.forEach(n => frecuencias[n] = (frecuencias[n] || 0) + 1);\n\nconst maxFreq = Math.max(...Object.values(frecuencias));\nconst moda = Object.keys(frecuencias).filter(k => frecuencias[k] === maxFreq).map(Number);\n\n// Primos\nconst isPrime = num => {\n    if (num <= 1 || !Number.isInteger(num)) return false;\n    for (let i = 2; i <= Math.sqrt(num); i++) if (num % i === 0) return false;\n    return true;\n};\n\nreturn {\n  json: {\n    cantidad,\n    suma: Number(suma.toFixed(2)),\n    promedio: Number(promedio.toFixed(2)),\n    mediana: Number(mediana.toFixed(2)),\n    desviacion: Number(desviacion.toFixed(2)),\n    moda: maxFreq === 1 ? [] : moda,\n    minimo: sorted.length ? sorted[0] : 0,\n    maximo: sorted.length ? sorted[sorted.length - 1] : 0,\n    lista_desc: [...sorted].reverse(),\n    lista_asc: sorted,\n    positivos: positivos.sort((a,b) => b-a),\n    negativos: negativos.sort((a,b) => a-b),\n    pares: todos.filter(n => Number.isInteger(n) && n % 2 === 0).sort((a,b)=>a-b),\n    impares: todos.filter(n => Number.isInteger(n) && n % 2 !== 0).sort((a,b)=>a-b),\n    primos: todos.filter(isPrime).sort((a,b)=>a-b),\n    frecuencias\n  }\n};"
+      },
+      "id": "node-final-calc",
+      "name": "2. Cálculos Finales y Formateo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook POST": {
+      "main": [
+        [
+          {
+            "node": "1. Extracción y Clasificación",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1. Extracción y Clasificación": {
+      "main": [
+        [
+          {
+            "node": "2. Cálculos Finales y Formateo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

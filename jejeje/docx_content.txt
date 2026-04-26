@@ -1,0 +1,75 @@
+Documentación técnica y funcional
+Frontend MVP SaaS multiempresa
+Documento operativo para implementación del equipo frontend
+
+1. Resumen del frontend MVP
+Objetivo: construir una SPA administrativa multi-tenant con autenticación, control por rol, CRUDs administrativos, auditoría y gestión de sesiones.
+Alcance MVP: auth, perfil, cambio de contraseña, dashboards, empresas, usuarios, auditoría, sesiones y páginas de sistema.
+Módulos principales: auth, profile, dashboard, tenants, users, audit, sessions y system.
+2. Roles y acceso
+2.1 SuperAdmin
+
+2.2 Admin de empresa
+
+2.3 Usuario normal
+
+3. Mapa de módulos
+
+4. Sitemap / rutas frontend
+4.1 Público
+/login
+/forgot-password
+/reset-password
+4.2 Común autenticado
+/profile
+/change-password
+/sessions
+/session-expired
+/403
+/404
+/tenant-suspended
+/user-blocked
+4.3 SuperAdmin
+/superadmin/dashboard
+/superadmin/tenants
+/superadmin/tenants/new
+/superadmin/tenants/:id
+/superadmin/tenants/:id/edit
+/superadmin/users
+/superadmin/users/:id
+/superadmin/audit-logs
+/superadmin/users/:id/sessions
+4.4 Admin
+/app/dashboard
+/app/users
+/app/users/new
+/app/admins/new
+/app/users/:id
+/app/users/:id/edit
+/app/audit-logs
+/app/users/:id/sessions
+4.5 Usuario
+/app/home
+5. Tabla de pantallas
+
+6. CRUDs del frontend
+
+7. Formularios necesarios
+
+8. Componentes compartidos imprescindibles
+
+9. Guards y control de acceso
+
+10. Tabla pantalla → endpoint
+
+11. Estados UI mínimos a contemplar
+
+12. Recomendación técnica de frontend
+Organización por features: auth, profile, dashboard, tenants, users, audit, sessions y system.
+Server state: TanStack Query (o equivalente) para listados, detalles, dashboards, auditoría y sesiones.
+Estado global ligero: store para auth/session meta, current user summary y flags UI.
+Formularios: react-hook-form + esquema de validación (zod/yup o equivalente).
+Cliente HTTP único con interceptores: attach token, refresh, normalización de errores y redirección controlada.
+Invalidación de caché tras mutation: listas, detalle relacionado y dashboard si cambia el dato mostrado.
+Limpieza de sesión: logout o invalidate → limpiar auth store, query cache y cualquier dato tenant-scoped.
+13. Orden recomendado de implementación
