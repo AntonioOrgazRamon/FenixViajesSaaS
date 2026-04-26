@@ -39,6 +39,6 @@ coverage/
 # Archivos de extracción local
 jejeje/docx_content.txt
 
-# Uploads (local dev; mantener estructura con .gitkeep si aplica)
-jejeje/backend/uploads/**
+# Uploads (local); versionar solo el directorio vacío
+jejeje/backend/uploads/*
 !jejeje/backend/uploads/.gitkeep
