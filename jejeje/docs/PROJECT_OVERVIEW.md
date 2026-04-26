@@ -1,6 +1,6 @@
 # Visión general del proyecto (MVP SaaS multiempresa)
 
-Documento de referencia técnica-resumida del estado del repositorio `jejeje`: backend API, frontend SPA, datos y despliegue local.
+Documento de referencia técnica-resumida del estado del repositorio `saas_practicas_nakedcode`: backend API, frontend SPA, datos y despliegue local.
 
 ---
 

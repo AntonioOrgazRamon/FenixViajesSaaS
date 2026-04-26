@@ -7,24 +7,36 @@ const userService = new UserService();
 
 export class UserController {
   async getUsers(req: Request, res: Response) {
-    const { companyId, role } = req.query;
-    const page = parseInt(req.query.page as string) || 1;
-    const pageSize = parseInt(req.query.pageSize as string) || 10;
-    
-    let targetCompanyId = companyId as string;
+    const { companyId, role, status } = req.query;
+    const q = (req.query.q as string) || (req.query.search as string) || undefined;
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string) || 10));
+
+    let targetCompanyId: string | undefined;
     if (req.user?.role === 'COMPANY_ADMIN' || req.user?.role === 'COMPANY_USER') {
-      targetCompanyId = req.user.companyId!;
+      targetCompanyId = req.user.companyId ?? undefined;
+    } else {
+      const cid = typeof companyId === 'string' && companyId.trim() ? companyId.trim() : undefined;
+      targetCompanyId = cid;
     }
 
-    const users = await userService.getUsers(targetCompanyId, role as string, page, pageSize);
+    const users = await userService.getUsers(targetCompanyId, {
+      role: typeof role === 'string' ? role : undefined,
+      status: typeof status === 'string' ? status : undefined,
+      q: typeof q === 'string' ? q : undefined,
+      page,
+      pageSize,
+    });
     res.json({ success: true, data: users });
   }
 
   async getUserById(req: Request, res: Response) {
     const user = await userService.getUserById(req.params.id as string);
-    
-    if (req.user?.role === 'COMPANY_ADMIN' && user.companyId !== req.user.companyId) {
-      throw new ForbiddenError('No tienes permiso para ver este usuario');
+
+    if (req.user?.role === 'COMPANY_ADMIN' || req.user?.role === 'COMPANY_USER') {
+      if (user.companyId == null || user.companyId !== req.user.companyId) {
+        throw new ForbiddenError('No tienes permiso para ver este usuario');
+      }
     }
 
     res.json({ success: true, data: user });

@@ -17,7 +17,6 @@ out/
 target/
 *.class
 *.jar
-!**/gradle/wrapper/gradle-wrapper.jar
 
 # Logs and OS
 *.log
@@ -37,8 +36,8 @@ coverage/
 .nyc_output/
 
 # Archivos de extracción local
-jejeje/docx_content.txt
+saas_practicas_nakedcode/docx_content.txt
 
 # Uploads (local); versionar solo el directorio vacío
-jejeje/backend/uploads/*
-!jejeje/backend/uploads/.gitkeep
+saas_practicas_nakedcode/backend/uploads/*
+!saas_practicas_nakedcode/backend/uploads/.gitkeep

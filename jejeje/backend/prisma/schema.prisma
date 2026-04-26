@@ -49,6 +49,17 @@ enum AuthProvider {
   LOCAL_GOOGLE
 }
 
+enum UserAvatarType {
+  DEFAULT
+  UPLOADED
+}
+
+enum UserAvatarShape {
+  CIRCLE
+  ROUNDED
+  SQUARE
+}
+
 enum LeadSource {
   WEB_FORM
   CHATBOT
@@ -137,6 +148,11 @@ model Company {
   leadNotes         LeadNote[]
   leadAgentRuns     LeadAgentRun[]
 
+  travelDocuments   TravelDocument[]
+  travelTrips       TravelTrip[]
+  destinations      Destination[]
+  travelImportJobs  TravelImportJob[]
+
   @@index([status])
   @@map("companies")
 }
@@ -153,7 +169,12 @@ model User {
   phone               String?
   locale              String?
   timezone            String?
-  avatarUrl           String?       @map("avatar_url") @db.VarChar(500)
+  avatarUrl           String?          @map("avatar_url") @db.VarChar(500)
+  avatarType          UserAvatarType   @default(DEFAULT) @map("avatar_type")
+  avatarBackgroundColor String?        @map("avatar_background_color") @db.VarChar(7)
+  avatarTextColor       String?        @map("avatar_text_color") @db.VarChar(7)
+  avatarInitials        String?        @map("avatar_initials") @db.VarChar(3)
+  avatarShape           UserAvatarShape @default(CIRCLE) @map("avatar_shape")
   theme               Theme         @default(SYSTEM)
   googleId            String?       @unique @map("google_id") @db.VarChar(255)
   authProvider        AuthProvider  @default(LOCAL) @map("auth_provider")
@@ -200,16 +221,19 @@ model Session {
 }
 
 model PasswordResetToken {
-  id        String    @id @default(uuid()) @db.Char(36)
-  userId    String    @map("user_id") @db.Char(36)
-  tokenHash String    @map("token_hash")
-  expiresAt DateTime  @map("expires_at")
-  usedAt    DateTime? @map("used_at")
-  createdAt DateTime  @default(now()) @map("created_at")
+  id          String    @id @default(uuid()) @db.Char(36)
+  userId      String    @map("user_id") @db.Char(36)
+  /// SHA-256 hex (o HMAC) del token en claro. Nunca guardar el token en texto plano.
+  tokenHash   String    @unique @map("token_hash") @db.VarChar(64)
+  expiresAt   DateTime  @map("expires_at")
+  usedAt      DateTime? @map("used_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  requestedIp String?   @map("requested_ip") @db.VarChar(64)
+  userAgent   String?   @map("user_agent") @db.VarChar(500)
 
-  user      User      @relation(fields: [userId], references: [id])
+  user        User      @relation(fields: [userId], references: [id])
 
-  @@index([userId])
+  @@index([userId, usedAt, expiresAt])
   @@index([expiresAt])
   @@map("password_reset_tokens")
 }
@@ -296,6 +320,7 @@ model LeadDetail {
   technicalSnapshot  Json?    @map("technical_snapshot")
   commercialSnapshot Json?    @map("commercial_snapshot")
   extraData          Json?    @map("extra_data")
+  travelContext      Json?    @map("travel_context")
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 
@@ -364,4 +389,249 @@ model LeadAgentRun {
 
   @@index([companyId, leadId, createdAt])
   @@map("lead_agent_runs")
+}
+
+// ---------------------------------------------------------------------------
+// Catálogo de viajes (ingestión PDF → viajes estructurados, multiempresa)
+// ---------------------------------------------------------------------------
+
+enum TravelDocumentStatus {
+  UPLOADED
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+enum TravelTripStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum DestinationKind {
+  COUNTRY
+  REGION
+  CITY
+  AREA
+  ATTRACTION
+}
+
+enum TripServiceKind {
+  INCLUDED
+  NOT_INCLUDED
+  OPTIONAL
+}
+
+enum TravelImportJobStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+model TravelDocument {
+  id                 String               @id @default(uuid()) @db.Char(36)
+  companyId          String               @map("company_id") @db.Char(36)
+  filename           String               @db.VarChar(255)
+  originalName       String               @map("original_name") @db.VarChar(500)
+  mimeType           String               @map("mime_type") @db.VarChar(120)
+  size               Int
+  storagePath        String               @map("storage_path") @db.VarChar(1000)
+  status             TravelDocumentStatus @default(UPLOADED)
+  totalPages         Int?                 @map("total_pages")
+  extractedTextPath  String?              @map("extracted_text_path") @db.VarChar(1000)
+  errorMessage       String?              @map("error_message") @db.Text
+  createdAt          DateTime             @default(now()) @map("created_at")
+  updatedAt          DateTime             @updatedAt @map("updated_at")
+
+  company            Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  trips              TravelTrip[]
+  importJobs         TravelImportJob[]
+
+  @@index([companyId, status, createdAt])
+  @@map("travel_documents")
+}
+
+model TravelTrip {
+  id                 String            @id @default(uuid()) @db.Char(36)
+  companyId          String            @map("company_id") @db.Char(36)
+  documentId         String?           @map("document_id") @db.Char(36)
+  title              String            @db.VarChar(500)
+  provider           String?           @db.VarChar(255)
+  season             String?           @db.VarChar(120)
+  mainDestination    String?           @map("main_destination") @db.VarChar(300)
+  description        String?           @db.Text
+  durationDays       Int?              @map("duration_days")
+  durationNights     Int?              @map("duration_nights")
+  indicativePrice    Decimal?          @map("indicative_price") @db.Decimal(12, 2)
+  currency           String?           @db.VarChar(3)
+  status             TravelTripStatus  @default(PENDING_REVIEW)
+  confidenceScore    Float?            @map("confidence_score")
+  sourcePageStart    Int?              @map("source_page_start")
+  sourcePageEnd      Int?              @map("source_page_end")
+  rawExtractedText   String?           @map("raw_extracted_text") @db.LongText
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+
+  company            Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  document           TravelDocument?   @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  tripDestinations   TravelTripDestination[]
+  itineraryDays      TripItineraryDay[]
+  services           TripCatalogService[]
+  departures         TripDeparture[]
+  hotels             TripHotel[]
+  highlights         TripHighlight[]
+  observations       TripObservation[]
+
+  @@index([companyId, status, createdAt])
+  @@index([companyId, documentId])
+  @@index([documentId])
+  @@map("travel_trips")
+}
+
+model Destination {
+  id                String            @id @default(uuid()) @db.Char(36)
+  companyId         String            @map("company_id") @db.Char(36)
+  name              String            @db.VarChar(255)
+  type              DestinationKind
+  normalizedName    String            @map("normalized_name") @db.VarChar(255)
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  company           Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  tripDestinations  TravelTripDestination[]
+
+  @@unique([companyId, normalizedName, type])
+  @@index([companyId, normalizedName])
+  @@map("destinations")
+}
+
+model TravelTripDestination {
+  tripId         String       @map("trip_id") @db.Char(36)
+  destinationId  String       @map("destination_id") @db.Char(36)
+  orderIndex     Int          @default(0) @map("order_index")
+
+  trip           TravelTrip   @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  destination    Destination  @relation(fields: [destinationId], references: [id], onDelete: Cascade)
+
+  @@id([tripId, destinationId])
+  @@index([destinationId])
+  @@map("travel_trip_destinations")
+}
+
+model TripItineraryDay {
+  id             String     @id @default(uuid()) @db.Char(36)
+  tripId         String     @map("trip_id") @db.Char(36)
+  dayNumber      Int        @map("day_number")
+  title          String?    @db.VarChar(500)
+  description    String?    @db.Text
+  meals          String?    @db.Text
+  accommodation  String?    @db.Text
+  orderIndex     Int        @default(0) @map("order_index")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  trip           TravelTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId, dayNumber])
+  @@map("trip_itinerary_days")
+}
+
+model TripCatalogService {
+  id        String          @id @default(uuid()) @db.Char(36)
+  tripId    String          @map("trip_id") @db.Char(36)
+  type      TripServiceKind
+  text      String          @db.Text
+  orderIndex Int            @default(0) @map("order_index")
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+
+  trip      TravelTrip      @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId, type])
+  @@map("trip_catalog_services")
+}
+
+model TripDeparture {
+  id            String     @id @default(uuid()) @db.Char(36)
+  tripId        String     @map("trip_id") @db.Char(36)
+  departureText String     @map("departure_text") @db.Text
+  startDate     DateTime?  @map("start_date") @db.Date
+  endDate       DateTime?  @map("end_date") @db.Date
+  weekdays      String?    @db.VarChar(100)
+  orderIndex    Int        @default(0) @map("order_index")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+
+  trip          TravelTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+  @@map("trip_departures")
+}
+
+model TripHotel {
+  id         String     @id @default(uuid()) @db.Char(36)
+  tripId     String     @map("trip_id") @db.Char(36)
+  category   String?    @db.VarChar(50)
+  city       String?    @db.VarChar(150)
+  hotelName  String?    @map("hotel_name") @db.VarChar(255)
+  orderIndex Int        @default(0) @map("order_index")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  trip       TravelTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+  @@map("trip_hotels")
+}
+
+model TripHighlight {
+  id         String     @id @default(uuid()) @db.Char(36)
+  tripId     String     @map("trip_id") @db.Char(36)
+  text       String     @db.Text
+  orderIndex Int        @default(0) @map("order_index")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  trip       TravelTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+  @@map("trip_highlights")
+}
+
+model TripObservation {
+  id         String     @id @default(uuid()) @db.Char(36)
+  tripId     String     @map("trip_id") @db.Char(36)
+  text       String     @db.Text
+  orderIndex Int        @default(0) @map("order_index")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  trip       TravelTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+  @@map("trip_observations")
+}
+
+model TravelImportJob {
+  id             String                @id @default(uuid()) @db.Char(36)
+  companyId      String                @map("company_id") @db.Char(36)
+  documentId     String?               @map("document_id") @db.Char(36)
+  status         TravelImportJobStatus @default(PENDING)
+  currentStep    String?               @map("current_step") @db.VarChar(200)
+  progress       Int                   @default(0)
+  errorMessage   String?               @map("error_message") @db.Text
+  startedAt      DateTime?             @map("started_at")
+  finishedAt     DateTime?             @map("finished_at")
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+
+  company        Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  document       TravelDocument?       @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, documentId, createdAt])
+  @@index([status, createdAt])
+  @@map("travel_import_jobs")
 }

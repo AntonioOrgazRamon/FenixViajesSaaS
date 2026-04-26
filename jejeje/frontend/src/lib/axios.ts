@@ -29,7 +29,11 @@ api.interceptors.response.use(
       localStorage.removeItem('refreshToken');
       if (hadSession && typeof window !== 'undefined') {
         const path = window.location.pathname;
-        if (!path.startsWith('/login') && !path.startsWith('/forgot-password') && !path.startsWith('/reset-password')) {
+        if (
+          !path.startsWith('/login') &&
+          !path.startsWith('/forgot-password') &&
+          !path.startsWith('/reset-password')
+        ) {
           window.location.assign('/session-expired');
         }
       }

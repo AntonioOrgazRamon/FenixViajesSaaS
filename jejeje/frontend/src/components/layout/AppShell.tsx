@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Building2,
   ClipboardList,
+  FileText,
   Home,
   KeyRound,
   LayoutDashboard,
@@ -19,20 +20,13 @@ import {
 import { cn } from '../../lib/cn';
 import { api } from '../../lib/axios';
 import { useAuthStore, type AppRole } from '../../store/authStore';
+import { UserAvatarView } from '../../lib/userAvatarView';
 import { SidebarThemeToggle } from './SidebarThemeToggle';
 
 function roleLabel(role: AppRole | undefined): string {
   if (role === 'SUPER_ADMIN') return 'Super admin';
   if (role === 'COMPANY_ADMIN') return 'Admin empresa';
   return 'Usuario';
-}
-
-function userInitials(user: { firstName?: string | null; lastName?: string | null; email: string }): string {
-  const a = user.firstName?.trim().charAt(0);
-  const b = user.lastName?.trim().charAt(0);
-  if (a && b) return (a + b).toUpperCase();
-  if (a) return a.toUpperCase();
-  return user.email.charAt(0).toUpperCase();
 }
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -91,12 +85,14 @@ export function AppShell() {
     { to: '/superadmin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/superadmin/tenants', label: 'Empresas', icon: Building2 },
     { to: '/superadmin/users', label: 'Usuarios', icon: Users },
+    { to: '/superadmin/travel', label: 'Catálogo (PDF)', icon: FileText },
     { to: '/superadmin/audit-logs', label: 'Auditoría', icon: ClipboardList },
   ];
 
   const adminLinks: { to: string; label: string; icon: typeof LayoutDashboard }[] = [
     { to: '/app/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/leads', label: 'Leads', icon: Target },
+    { to: '/app/travel', label: 'Catálogo (PDF)', icon: FileText },
     { to: '/app/users', label: 'Usuarios', icon: Users },
     { to: '/app/users/new', label: 'Nuevo usuario', icon: UserPlus },
     { to: '/app/admins/new', label: 'Nuevo admin', icon: Shield },
@@ -120,11 +116,13 @@ export function AppShell() {
     return [
       { to: '/app/home', label: 'Inicio', icon: Home },
       { to: '/leads', label: 'Leads', icon: Target },
+      { to: '/app/users', label: 'Usuarios', icon: Users },
     ] as { to: string; label: string; icon: typeof Home }[];
   };
 
   const links = roleLinks(role);
-  const endMatch = (to: string) => to === '/app/users' || to === '/superadmin/users';
+  const endMatch = (to: string) =>
+    to === '/app/users' || to === '/superadmin/users' || to === '/app/travel' || to === '/superadmin/travel';
 
   const NavBlock = ({ onNavigate }: { onNavigate?: () => void }) => (
     <>
@@ -210,20 +208,7 @@ export function AppShell() {
                 'dark:border-white/[0.07] dark:bg-black/20 dark:shadow-none',
               )}
             >
-              {user?.avatar_url ? (
-                <img
-                  src={user.avatar_url}
-                  alt=""
-                  className="h-11 w-11 shrink-0 rounded-xl border border-zinc-200/80 object-cover dark:border-white/10"
-                />
-              ) : (
-                <div
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-amber-200/60 bg-amber-50 text-xs font-semibold text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200"
-                  aria-hidden
-                >
-                  {user ? userInitials(user) : '?'}
-                </div>
-              )}
+              {user ? <UserAvatarView user={user} size="md" className="border border-zinc-200/80 dark:border-white/10" /> : null}
               <div className="min-w-0 flex-1">
                 <p className="truncate text-xs font-medium leading-snug text-zinc-800 dark:text-zinc-200">{user?.email}</p>
                 <span
@@ -318,20 +303,7 @@ export function AppShell() {
             >
               <div className="flex items-center justify-between gap-3 border-b border-zinc-200/90 px-4 py-4 dark:border-white/[0.06]">
                 <div className="flex min-w-0 items-center gap-2">
-                  {user?.avatar_url ? (
-                    <img
-                      src={user.avatar_url}
-                      alt=""
-                      className="h-9 w-9 shrink-0 rounded-lg border border-zinc-200/80 object-cover dark:border-white/10"
-                    />
-                  ) : (
-                    <div
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-[10px] font-semibold text-amber-800 dark:bg-amber-500/15 dark:text-amber-200"
-                      aria-hidden
-                    >
-                      {user ? userInitials(user) : '?'}
-                    </div>
-                  )}
+                  {user ? <UserAvatarView user={user} size="sm" className="border border-zinc-200/80 dark:border-white/10" /> : null}
                   <div className="min-w-0">
                     <span className="block truncate text-sm font-bold text-zinc-900 dark:text-white" style={{ fontFamily: 'var(--font-display)' }}>
                       Menú

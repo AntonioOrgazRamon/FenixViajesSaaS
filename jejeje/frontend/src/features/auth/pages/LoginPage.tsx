@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import gsap from 'gsap';
 import { ArrowRight, Lock, Mail, Sparkles, Workflow, Zap } from 'lucide-react';
 import clsx from 'clsx';
@@ -68,8 +68,10 @@ function NakedCodeBrandLink({
 
 export const LoginPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const setAuth = useAuthStore((s) => s.setAuth);
   const [error, setError] = useState<string | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
 
   const rootRef = useRef<HTMLDivElement>(null);
   const leftRef = useRef<HTMLDivElement>(null);
@@ -90,6 +92,14 @@ export const LoginPage = () => {
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
   });
+
+  useEffect(() => {
+    const msg = (location.state as { message?: string } | null)?.message;
+    if (msg) {
+      setFlash(msg);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location, navigate]);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -407,6 +417,16 @@ export const LoginPage = () => {
                   {errors.password && <p className="text-sm text-red-400/90">{errors.password.message}</p>}
                 </div>
 
+                {flash && (
+                  <div
+                    data-login-reveal
+                    role="status"
+                    className="rounded-xl border border-emerald-500/25 bg-emerald-500/[0.12] px-4 py-3 text-center text-sm text-emerald-100/95"
+                  >
+                    {flash}
+                  </div>
+                )}
+
                 {error && (
                   <div
                     data-login-reveal
@@ -422,7 +442,7 @@ export const LoginPage = () => {
                     to="/forgot-password"
                     className="cursor-pointer text-sm font-medium text-amber-400/90 underline-offset-4 transition-colors duration-200 hover:text-amber-300 hover:underline focus-visible:rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400/60"
                   >
-                    ¿Olvidaste tu contraseña?
+                    ¿Has olvidado tu contraseña?
                   </Link>
                 </div>
 

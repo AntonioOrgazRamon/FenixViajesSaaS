@@ -1,6 +1,15 @@
+import { Prisma, CompanyStatus } from '@prisma/client';
 import prisma from '../../infrastructure/db';
 import bcrypt from 'bcrypt';
 import { ConflictError, NotFoundError, ValidationError } from '../../common/errors/AppError';
+
+const companyStatusValues = new Set<CompanyStatus>(Object.values(CompanyStatus));
+
+function parseStatus(s: string | undefined): CompanyStatus | undefined {
+  if (!s || !s.trim()) return undefined;
+  const u = s.trim() as CompanyStatus;
+  return companyStatusValues.has(u) ? u : undefined;
+}
 
 export class CompanyService {
   async create(data: any, actorUserId: string) {
@@ -54,14 +63,86 @@ export class CompanyService {
     return result;
   }
 
-  async findAll(page = 1, pageSize = 10) {
-    const skip = (page - 1) * pageSize;
-    const [total, data] = await Promise.all([
-      prisma.company.count(),
-      prisma.company.findMany({ skip, take: pageSize, orderBy: { createdAt: 'desc' } })
+  async findAll(
+    page = 1,
+    pageSize = 10,
+    filters: {
+      q?: string;
+      status?: string;
+      leadsMin?: number;
+      leadsMax?: number;
+      usersMin?: number;
+      usersMax?: number;
+    } = {},
+  ) {
+    const take = Math.min(100, Math.max(1, pageSize));
+    const p = Math.max(1, page);
+    const skip = (p - 1) * take;
+
+    const { q, status: stIn, leadsMin, leadsMax, usersMin, usersMax } = filters;
+    const st = parseStatus(stIn);
+    const t = (q || '').trim();
+
+    const whereParts: Prisma.Sql[] = [];
+    if (st) {
+      whereParts.push(Prisma.sql`c.status = ${st}`);
+    }
+    if (t) {
+      const like = `%${t}%`;
+      whereParts.push(Prisma.sql`(c.name LIKE ${like} OR c.slug LIKE ${like})`);
+    }
+    if (leadsMin != null) {
+      whereParts.push(Prisma.sql`(SELECT COUNT(*) FROM \`leads\` l WHERE l.company_id = c.id) >= ${leadsMin}`);
+    }
+    if (leadsMax != null) {
+      whereParts.push(Prisma.sql`(SELECT COUNT(*) FROM \`leads\` l WHERE l.company_id = c.id) <= ${leadsMax}`);
+    }
+    if (usersMin != null) {
+      whereParts.push(Prisma.sql`(SELECT COUNT(*) FROM \`users\` u WHERE u.company_id = c.id) >= ${usersMin}`);
+    }
+    if (usersMax != null) {
+      whereParts.push(Prisma.sql`(SELECT COUNT(*) FROM \`users\` u WHERE u.company_id = c.id) <= ${usersMax}`);
+    }
+
+    const whereSql = whereParts.length > 0 ? Prisma.join(whereParts, ' AND ') : Prisma.sql`1=1`;
+
+    type CRow = {
+      id: string;
+      name: string;
+      slug: string;
+      status: string;
+      created_at: Date;
+      updated_at: Date;
+      lead_cnt: bigint;
+      user_cnt: bigint;
+    };
+
+    const [countRows, listRows] = await Promise.all([
+      prisma.$queryRaw<[{ c: bigint }]>(Prisma.sql`SELECT COUNT(*) as c FROM \`companies\` c WHERE ${whereSql}`),
+      prisma.$queryRaw<CRow[]>(Prisma.sql`
+        SELECT c.id, c.name, c.slug, c.status, c.created_at, c.updated_at,
+          (SELECT COUNT(*) FROM \`leads\` l WHERE l.company_id = c.id) AS lead_cnt,
+          (SELECT COUNT(*) FROM \`users\` u WHERE u.company_id = c.id) AS user_cnt
+        FROM \`companies\` c
+        WHERE ${whereSql}
+        ORDER BY c.created_at DESC
+        LIMIT ${take} OFFSET ${skip}
+      `),
     ]);
 
-    return { total, page, pageSize, data };
+    const total = Number(countRows[0]?.c ?? 0);
+    const data = listRows.map((c) => ({
+      id: c.id,
+      name: c.name,
+      slug: c.slug,
+      status: c.status,
+      createdAt: c.created_at,
+      updatedAt: c.updated_at,
+      leadsCount: Number(c.lead_cnt),
+      usersCount: Number(c.user_cnt),
+    }));
+
+    return { total, page: p, pageSize: take, data };
   }
 
   async findById(id: string) {

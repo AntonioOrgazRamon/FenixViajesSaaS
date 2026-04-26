@@ -13,9 +13,14 @@ router.get(
   userController.getUsers.bind(userController),
 );
 
+router.get(
+  '/:id',
+  requireRole(['SUPER_ADMIN', 'COMPANY_ADMIN', 'COMPANY_USER']),
+  userController.getUserById.bind(userController),
+);
+
 router.use(requireRole(['SUPER_ADMIN', 'COMPANY_ADMIN']));
 
-router.get('/:id', userController.getUserById.bind(userController));
 router.post('/', userController.createUser.bind(userController));
 router.patch('/:id', userController.updateUser.bind(userController));
 router.delete('/:id', userController.deleteUser.bind(userController));

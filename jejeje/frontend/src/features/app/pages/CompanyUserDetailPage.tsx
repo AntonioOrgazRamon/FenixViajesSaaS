@@ -2,9 +2,11 @@ import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../lib/axios';
 import { unwrap } from '../../../lib/api';
+import { useAuthStore } from '../../../store/authStore';
 import type { UserDetail } from '../../../types/domain';
 
 export function CompanyUserDetailPage() {
+  const canManage = useAuthStore((s) => s.user?.role === 'COMPANY_ADMIN');
   const { id } = useParams<{ id: string }>();
   const { data, isLoading, error } = useQuery<UserDetail>({
     queryKey: ['user', id],
@@ -38,14 +40,22 @@ export function CompanyUserDetailPage() {
           <dd className="text-zinc-200">{data.status}</dd>
         </div>
       </dl>
-      <div className="mt-6 flex flex-wrap gap-3">
-        <Link to={`/app/users/${id}/edit`} className="rounded-lg border border-white/15 px-4 py-2 text-sm text-zinc-200 hover:bg-white/5">
-          Editar
-        </Link>
-        <Link to={`/app/users/${id}/sessions`} className="rounded-lg border border-amber-500/30 px-4 py-2 text-sm text-amber-200 hover:bg-amber-500/10">
-          Sesiones
-        </Link>
-      </div>
+      {canManage && (
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link
+            to={`/app/users/${id}/edit`}
+            className="rounded-lg border border-zinc-300 px-4 py-2 text-sm text-zinc-200 hover:bg-white/5 dark:border-white/15"
+          >
+            Editar
+          </Link>
+          <Link
+            to={`/app/users/${id}/sessions`}
+            className="rounded-lg border border-amber-500/30 px-4 py-2 text-sm text-amber-800 hover:bg-amber-500/10 dark:text-amber-200"
+          >
+            Sesiones
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

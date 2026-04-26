@@ -1,39 +1,21 @@
 # Fenix Viajes SaaS
 
-Monorepo con el producto principal en **`jejeje/`** (SaaS multi-tenant: API Node + SPA React) y material adicional (Angular, Spring Boot, n8n, Docker).
+Producto en **`saas_practicas_nakedcode/`**: API **Node.js + Express + Prisma (MySQL)** y SPA **Vite + React**.
 
-## Estructura rápida
+Si en tu disco la carpeta aún se llama `jejeje`, **cierra el IDE**, renómbrala a `saas_practicas_nakedcode` y vuelve a abrir el workspace (o sigue `RENOMBRAR_CARPETA.md`).
 
-| Ruta | Descripción |
-|------|-------------|
-| **`jejeje/backend`** | API Express + Prisma (MySQL), JWT, módulos auth, empresas, usuarios, leads, etc. |
-| **`jejeje/frontend`** | SPA Vite + React 19 + Tailwind; consume `VITE_API_URL` → `http://localhost:3000/api/v1` por defecto. |
-| **`jejeje/docs`** | Visión general técnica del MVP (`PROJECT_OVERVIEW.md`). |
-| **`backend/`** | API **Java / Spring Boot 3** (multi-tenant, PostgreSQL, Flyway). Requiere Maven y Postgres. |
-| **`frontend/`** | App **Angular 19** (otro front del repo). |
-| **`backend/frontend/`** | Copia / duplicado del Angular anterior (mismo `package.json` que `frontend/`). |
-| **`n8n-number-processor/`** | Proyecto **Angular 17** independiente. |
-| **`docker-compose.yml`** | PostgreSQL 15 para el stack **Java** (no el MySQL de `jejeje`). |
+## Inicio rápido
 
-## Ramas de Git (estrategia)
-
-- **`main`**: monorepo completo (recomendada para clonar y ver todo).
-- **`frontend`**: solo el código de `jejeje/frontend` en la raíz de la rama (vía `git subtree`).
-- **`backend`**: solo el código de `jejeje/backend` en la raíz de la rama.
-- **`otros`**: resto del monorepo **sin** la carpeta `jejeje/` (Angular, Spring, n8n, Docker).
+1. `saas_practicas_nakedcode/backend/.env` a partir de `.env.example` (incl. `DATABASE_URL`).
+2. `cd saas_practicas_nakedcode/backend && npm install && npx prisma generate` y base de datos según `saas_practicas_nakedcode/backend/SETUP_DB.md`, luego `npm run dev` → **http://localhost:3000**
+3. `cd saas_practicas_nakedcode/frontend && npm install && npm run dev` → **http://localhost:5173**
 
 ## Documentación
 
-- [Documentación unificada](docs/DOCUMENTACION_FENIX_VIAJES.md) — repositorio, historial, despliegue local y ramas.
-- [Visión del MVP `jejeje`](jejeje/docs/PROJECT_OVERVIEW.md) — arquitectura, rutas, arranque.
-
-## Arranque rápido (stack `jejeje`)
-
-1. MySQL local o remoto; configurar `jejeje/backend/.env` (plantilla: `jejeje/backend/.env.example`).
-2. `cd jejeje/backend && npm install && npx prisma generate && npm run dev` → API en **:3000**.
-3. `cd jejeje/frontend && npm install && npm run dev` → Vite (p. ej. **:5173**).
-
-Más detalle en `jejeje/backend/SETUP_DB.md` y en `docs/DOCUMENTACION_FENIX_VIAJES.md`.
+- `saas_practicas_nakedcode/docs/PROJECT_OVERVIEW.md` — arquitectura
+- `saas_practicas_nakedcode/docs/TAREAS_PENDIENTES.md` — cierres pendientes (p. ej. email SMTP)
+- `saas_practicas_nakedcode/docs/DOCUMENTACION_FENIX_VIAJES.md` — repositorio y despliegue
+- `saas_practicas_nakedcode/backend/DOCUMENTATION.md` — API y módulos
 
 ---
 

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { AuthController } from './auth.controller';
 import { requireAuth } from '../../common/middlewares/auth';
-import { authRateLimiter } from '../../common/middlewares/rateLimit';
+import { authRateLimiter, forgotPasswordIpLimiter } from '../../common/middlewares/rateLimit';
 
 const router = Router();
 const authController = new AuthController();
@@ -16,10 +16,22 @@ router.get('/profile', requireAuth, authController.getProfile.bind(authControlle
 router.patch('/profile', requireAuth, authController.updateProfile.bind(authController));
 router.post('/change-password', requireAuth, authController.changePassword.bind(authController));
 
-// Password Reset Flow
-router.post('/forgot-password', authRateLimiter, authController.requestPasswordReset.bind(authController));
-router.post('/verify-reset-token', authRateLimiter, authController.verifyResetToken.bind(authController));
-router.post('/reset-password', authRateLimiter, authController.resetPassword.bind(authController));
+// Flujo de restablecimiento (IP limitada; anti-abuso por buzón en el servicio)
+router.post(
+  '/forgot-password',
+  forgotPasswordIpLimiter,
+  authController.requestPasswordReset.bind(authController)
+);
+router.post(
+  '/verify-reset-token',
+  forgotPasswordIpLimiter,
+  authController.verifyResetToken.bind(authController)
+);
+router.post(
+  '/reset-password',
+  forgotPasswordIpLimiter,
+  authController.resetPassword.bind(authController)
+);
 
 router.get('/google/start', (_req, res) => {
   res.status(501).json({

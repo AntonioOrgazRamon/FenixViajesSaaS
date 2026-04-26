@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { ProfileService } from './profile.service';
-import { avatarBodySchema, changeEmailSchema, updateProfileExtendedSchema } from './profile.schema';
+import { changeEmailSchema, patchDefaultAvatarSchema, updateProfileExtendedSchema } from './profile.schema';
 import { ValidationError } from '../../common/errors/AppError';
 
 const profileService = new ProfileService();
@@ -28,18 +28,18 @@ export class ProfileController {
     res.json({ success: true, data });
   }
 
-  async postAvatar(req: Request, res: Response) {
-    if (!req.user) throw new ValidationError('No autenticado');
-    const parsed = avatarBodySchema.safeParse(req.body);
-    if (!parsed.success) throw new ValidationError(parsed.error.issues[0]?.message ?? 'Body inválido');
-    const data = await profileService.setAvatarUrl(req.user.id, parsed.data.avatarUrl);
-    res.json({ success: true, data });
-  }
-
   async postAvatarUpload(req: Request, res: Response) {
     if (!req.user) throw new ValidationError('No autenticado');
     if (!req.file) throw new ValidationError('Selecciona un archivo de imagen');
     const data = await profileService.setAvatarFromFile(req.user.id, req.file);
+    res.json({ success: true, data });
+  }
+
+  async patchAvatarDefault(req: Request, res: Response) {
+    if (!req.user) throw new ValidationError('No autenticado');
+    const parsed = patchDefaultAvatarSchema.safeParse(req.body);
+    if (!parsed.success) throw new ValidationError(parsed.error.issues[0]?.message ?? 'Body inválido');
+    const data = await profileService.patchDefaultAvatar(req.user.id, parsed.data);
     res.json({ success: true, data });
   }
 

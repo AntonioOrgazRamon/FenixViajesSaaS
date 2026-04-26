@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { validateNewPasswordForReset } from '../../common/validation/passwordPolicy';
 
 export const loginSchema = z.object({
   email: z.string().email(),
@@ -36,11 +37,19 @@ export const verifyResetTokenSchema = z.object({
   token: z.string(),
 });
 
-export const resetPasswordSchema = z.object({
-  token: z.string(),
-  newPassword: z.string().min(8),
-  confirmPassword: z.string(),
-}).refine((data) => data.newPassword === data.confirmPassword, {
-  message: "Las contraseñas no coinciden",
-  path: ["confirmPassword"],
-});
+export const resetPasswordSchema = z
+  .object({
+    token: z.string().min(1, 'Falta el enlace o token de restablecimiento'),
+    newPassword: z.string(),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'Las contraseñas no coinciden',
+    path: ['confirmPassword'],
+  })
+  .superRefine((data, ctx) => {
+    const r = validateNewPasswordForReset(data.newPassword);
+    if (!r.ok) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['newPassword'], message: r.message });
+    }
+  });

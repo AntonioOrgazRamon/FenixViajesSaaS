@@ -5,6 +5,9 @@ export type Company = {
   status: string;
   createdAt: string;
   updatedAt: string;
+  /** Listado superadmin: conteos agregados */
+  leadsCount?: number;
+  usersCount?: number;
 };
 
 export type UserListItem = {
@@ -16,6 +19,7 @@ export type UserListItem = {
   status: string;
   companyId: string | null;
   createdAt: string;
+  company?: { id: string; name: string; slug: string } | null;
 };
 
 export type UserDetail = {

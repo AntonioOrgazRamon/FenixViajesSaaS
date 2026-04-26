@@ -5,9 +5,55 @@ import prisma from '../../infrastructure/db';
 import { config } from '../../common/config';
 import { logger } from '../../common/logger';
 import { UnauthorizedError, ForbiddenError, ValidationError } from '../../common/errors/AppError';
-import { ProfileService, toPublicAvatarUrl } from '../profile/profile.service';
+import { ProfileService } from '../profile/profile.service';
+import { buildClientAvatar, legacyAvatarUrlFrom } from '../profile/avatar-helpers';
+import {
+  createPasswordResetTokenPlain,
+  hashPasswordResetToken,
+} from '../../common/crypto/tokenHash';
+import { validateNewPasswordForReset } from '../../common/validation/passwordPolicy';
+import { sendPasswordResetEmail } from '../../infrastructure/email/email.service';
+import {
+  notePasswordResetEvent,
+  shouldBlockPasswordResetEmail,
+} from './passwordResetRateLimit';
+import { AuthProvider, CompanyStatus, UserStatus } from '@prisma/client';
 
 const profileService = new ProfileService();
+
+const GENERIC_FORGOT_RESPONSE = {
+  message: 'Si el correo existe en nuestro sistema, recibirás un enlace para restablecer tu contraseña.',
+};
+
+function normalizeEmail(s: string) {
+  return s.trim().toLowerCase();
+}
+
+function canRequestPasswordForUser(u: {
+  status: UserStatus;
+  authProvider: AuthProvider;
+  lockedUntil: Date | null;
+  company: { status: CompanyStatus } | null;
+}) {
+  if (u.status !== 'ACTIVE') return false;
+  if (u.lockedUntil && u.lockedUntil > new Date()) return false;
+  if (u.company && u.company.status !== CompanyStatus.ACTIVE) return false;
+  if (u.authProvider === 'GOOGLE') return false;
+  return true;
+}
+
+/**
+ * Misma lógica que "login" para comprobar si la nueva clave es la actual: verify contra el hash, no string compare.
+ */
+async function isSameAsCurrentPassword(plain: string, passwordHash: string) {
+  return bcrypt.compare(plain, passwordHash);
+}
+
+function genericResetLinkError() {
+  return new ValidationError(
+    'El enlace no es válido o ha caducado. Solicita uno nuevo en «He olvidado mi contraseña».'
+  );
+}
 
 export class AuthService {
   async login(email: string, password: string, ipAddress?: string, userAgent?: string, deviceName?: string) {
@@ -54,7 +100,6 @@ export class AuthService {
       throw new UnauthorizedError('Credenciales inválidas');
     }
 
-    // Reset failed attempts
     await prisma.user.update({
       where: { id: user.id },
       data: { failedLoginAttempts: 0, lastLoginAt: new Date() },
@@ -71,7 +116,7 @@ export class AuthService {
         ipAddress,
         userAgent,
         deviceName,
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 días
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       },
     });
 
@@ -83,7 +128,6 @@ export class AuthService {
       { expiresIn: '15m' }
     );
 
-    // Audit log
     await prisma.auditLog.create({
       data: {
         actorUserId: user.id,
@@ -98,6 +142,7 @@ export class AuthService {
       }
     });
 
+    const avatar = buildClientAvatar(user);
     return {
       accessToken,
       refreshToken,
@@ -107,8 +152,9 @@ export class AuthService {
         role: user.role,
         firstName: user.firstName,
         lastName: user.lastName,
-        avatar_url: toPublicAvatarUrl(user.avatarUrl),
         theme: user.theme,
+        avatar,
+        avatar_url: legacyAvatarUrlFrom(avatar),
       },
     };
   }
@@ -158,7 +204,6 @@ export class AuthService {
     const newRefreshTokenId = uuidv4();
     const newRefreshTokenHash = await bcrypt.hash(newRefreshTokenId, 10);
 
-    // Rotar token actualizando la sesión
     await prisma.session.update({
       where: { id: session.id },
       data: {
@@ -175,7 +220,6 @@ export class AuthService {
       { expiresIn: '15m' }
     );
 
-    // Audit log
     await prisma.auditLog.create({
       data: {
         actorUserId: user.id,
@@ -248,108 +292,238 @@ export class AuthService {
     return { message: 'Contraseña actualizada exitosamente' };
   }
 
-  async requestPasswordReset(email: string) {
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user || user.status !== 'ACTIVE') {
-      // Return success anyway to avoid email enumeration
-      return { message: 'Si el correo existe, se ha enviado un enlace de recuperación.' };
+  async requestPasswordReset(email: string, ipAddress?: string, userAgent?: string) {
+    const key = normalizeEmail(email);
+    const block = shouldBlockPasswordResetEmail(key);
+    if (block.blocked) {
+      await prisma.auditLog.create({
+        data: {
+          companyId: null,
+          action: 'AUTH_PASSWORD_RESET_REQUESTED',
+          targetType: 'EMAIL',
+          targetId: 'unknown',
+          result: 'FAILURE',
+          reason: block.reason,
+          ipAddress,
+          userAgent,
+        },
+      });
+      return GENERIC_FORGOT_RESPONSE;
     }
 
-    const token = uuidv4();
-    const tokenHash = await bcrypt.hash(token, 10);
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
-
-    await prisma.passwordResetToken.create({
-      data: {
-        userId: user.id,
-        tokenHash,
-        expiresAt,
-      }
+    const user = await prisma.user.findUnique({
+      where: { email: key },
+      include: { company: true },
     });
 
-    // Audit log
-    await prisma.auditLog.create({
-      data: {
-        actorUserId: user.id,
-        actorRole: user.role,
-        companyId: user.companyId,
-        action: 'AUTH_PASSWORD_RESET_REQUESTED',
-        targetType: 'USER',
-        targetId: user.id,
-        result: 'SUCCESS',
-      }
-    });
+    if (!user) {
+      await prisma.auditLog.create({
+        data: {
+          companyId: null,
+          action: 'AUTH_PASSWORD_RESET_REQUESTED',
+          targetType: 'EMAIL',
+          targetId: '00000000-0000-0000-0000-000000000000',
+          result: 'SUCCESS',
+          reason: 'no_user',
+          ipAddress,
+          userAgent,
+        },
+      });
+      notePasswordResetEvent(key);
+      return GENERIC_FORGOT_RESPONSE;
+    }
 
-    // TODO: Send email
-    logger.info(`Password reset token for ${email}: ${token}`);
+    if (!canRequestPasswordForUser({ ...user, company: user.company, lockedUntil: user.lockedUntil })) {
+      await prisma.auditLog.create({
+        data: {
+          actorUserId: user.id,
+          actorRole: user.role,
+          companyId: user.companyId,
+          action: 'AUTH_PASSWORD_RESET_REQUESTED',
+          targetType: 'USER',
+          targetId: user.id,
+          result: 'FAILURE',
+          reason: 'user_not_eligible',
+          ipAddress,
+          userAgent,
+        },
+      });
+      notePasswordResetEvent(key);
+      return GENERIC_FORGOT_RESPONSE;
+    }
 
-    return { message: 'Si el correo existe, se ha enviado un enlace de recuperación.' };
+    const plain = createPasswordResetTokenPlain();
+    const tokenHash = hashPasswordResetToken(plain);
+    const expiresAt = new Date(
+      Date.now() + config.PASSWORD_RESET_TTL_MINUTES * 60 * 1000
+    );
+
+    await prisma.$transaction([
+      prisma.passwordResetToken.deleteMany({
+        where: { userId: user.id, usedAt: null },
+      }),
+      prisma.passwordResetToken.create({
+        data: {
+          userId: user.id,
+          tokenHash,
+          expiresAt,
+          requestedIp: ipAddress,
+          userAgent: userAgent ?? null,
+        },
+      }),
+    ]);
+
+    const path = `/reset-password/${encodeURIComponent(plain)}`;
+    const result = await sendPasswordResetEmail(user.email, path);
+
+    if (result.sent) {
+      await prisma.auditLog.create({
+        data: {
+          actorUserId: user.id,
+          actorRole: user.role,
+          companyId: user.companyId,
+          action: 'AUTH_PASSWORD_RESET_EMAIL_SENT',
+          targetType: 'USER',
+          targetId: user.id,
+          result: 'SUCCESS',
+        },
+      });
+    } else {
+      logger.error(
+        { userId: user.id, err: !result.sent ? result.error : null },
+        'No se pudo completar el envío del enlace; el usuario no debe verlo'
+      );
+      await prisma.auditLog.create({
+        data: {
+          actorUserId: user.id,
+          actorRole: user.role,
+          companyId: user.companyId,
+          action: 'AUTH_PASSWORD_RESET_EMAIL_FAILED',
+          targetType: 'USER',
+          targetId: user.id,
+          result: 'FAILURE',
+          reason: !result.sent ? result.error : undefined,
+        },
+      });
+    }
+
+    notePasswordResetEvent(key);
+    return GENERIC_FORGOT_RESPONSE;
   }
 
-  async verifyResetToken(token: string) {
-    const tokens = await prisma.passwordResetToken.findMany({
-      where: {
-        usedAt: null,
-        expiresAt: { gt: new Date() }
-      },
-      include: { user: true }
+  private async getPasswordResetByPlainToken(plain: string) {
+    const tokenHash = hashPasswordResetToken(plain);
+    return prisma.passwordResetToken.findUnique({
+      where: { tokenHash },
+      include: { user: { include: { company: true } } },
     });
-
-    let validToken = null;
-    let user = null;
-
-    for (const t of tokens) {
-      const isValid = await bcrypt.compare(token, t.tokenHash);
-      if (isValid) {
-        validToken = t;
-        user = t.user;
-        break;
-      }
-    }
-
-    if (!validToken || !user) throw new ValidationError('Token inválido o expirado');
-
-    return { valid: true, userId: user.id };
   }
 
-  async resetPassword(token: string, newPassword: string) {
-    const tokens = await prisma.passwordResetToken.findMany({
-      where: {
-        usedAt: null,
-        expiresAt: { gt: new Date() }
-      },
-      include: { user: true }
-    });
+  async verifyResetToken(plain: string) {
+    const rec = await this.getPasswordResetByPlainToken(plain);
+    if (!rec || rec.usedAt || rec.expiresAt < new Date()) {
+      return { valid: false as const };
+    }
+    const { user } = rec;
+    if (!user || !canRequestPasswordForUser({ ...user, company: user.company, lockedUntil: user.lockedUntil })) {
+      return { valid: false as const };
+    }
+    return { valid: true as const };
+  }
 
-    let validToken = null;
-    let user = null;
-
-    for (const t of tokens) {
-      const isValid = await bcrypt.compare(token, t.tokenHash);
-      if (isValid) {
-        validToken = t;
-        user = t.user;
-        break;
-      }
+  async resetPassword(plain: string, newPassword: string, confirmPassword: string) {
+    if (newPassword !== confirmPassword) {
+      throw new ValidationError('Las contraseñas no coinciden');
     }
 
-    if (!validToken || !user) throw new ValidationError('Token inválido o expirado');
+    const rec = await this.getPasswordResetByPlainToken(plain);
+
+    if (!rec) {
+      await prisma.auditLog.create({
+        data: {
+          companyId: null,
+          action: 'AUTH_PASSWORD_RESET_FAILED',
+          targetType: 'PASSWORD_RESET_TOKEN',
+          targetId: 'invalid',
+          result: 'FAILURE',
+          reason: 'token_not_found',
+        },
+      });
+      throw genericResetLinkError();
+    }
+
+    if (rec.usedAt || rec.expiresAt < new Date()) {
+      await prisma.auditLog.create({
+        data: {
+          actorUserId: rec.userId,
+          companyId: rec.user?.companyId,
+          action: 'AUTH_PASSWORD_RESET_FAILED',
+          targetType: 'PASSWORD_RESET_TOKEN',
+          targetId: rec.id,
+          result: 'FAILURE',
+          reason: rec.usedAt ? 'token_used' : 'expired',
+        },
+      });
+      throw genericResetLinkError();
+    }
+
+    const user = rec.user;
+    if (!user) {
+      throw genericResetLinkError();
+    }
+    if (!canRequestPasswordForUser({ ...user, company: user.company, lockedUntil: user.lockedUntil })) {
+      throw genericResetLinkError();
+    }
+
+    const sameAsCurrent = await isSameAsCurrentPassword(newPassword, user.passwordHash);
+    if (sameAsCurrent) {
+      await prisma.auditLog.create({
+        data: {
+          actorUserId: user.id,
+          companyId: user.companyId,
+          action: 'AUTH_PASSWORD_RESET_FAILED',
+          targetType: 'USER',
+          targetId: user.id,
+          result: 'FAILURE',
+          reason: 'same_as_current',
+        },
+      });
+      throw new ValidationError('La nueva contraseña no puede ser igual a la anterior');
+    }
+
+    const policy = validateNewPasswordForReset(newPassword);
+    if (!policy.ok) {
+      await prisma.auditLog.create({
+        data: {
+          actorUserId: user.id,
+          companyId: user.companyId,
+          action: 'AUTH_PASSWORD_RESET_FAILED',
+          targetType: 'USER',
+          targetId: user.id,
+          result: 'FAILURE',
+          reason: 'weak_password',
+        },
+      });
+      throw new ValidationError('La contraseña no cumple los requisitos mínimos de seguridad.');
+    }
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
 
     await prisma.$transaction([
       prisma.user.update({
         where: { id: user.id },
-        data: { passwordHash }
+        data: { passwordHash, failedLoginAttempts: 0, lockedUntil: null },
       }),
       prisma.passwordResetToken.update({
-        where: { id: validToken.id },
-        data: { usedAt: new Date() }
+        where: { id: rec.id },
+        data: { usedAt: new Date() },
       }),
-      // Revoke all active sessions
+      prisma.passwordResetToken.deleteMany({
+        where: { userId: user.id, id: { not: rec.id } },
+      }),
       prisma.session.updateMany({
         where: { userId: user.id, revokedAt: null },
-        data: { revokedAt: new Date(), revokedReason: 'PASSWORD_RESET' }
+        data: { revokedAt: new Date(), revokedReason: 'PASSWORD_RESET' },
       }),
       prisma.auditLog.create({
         data: {
@@ -360,10 +534,24 @@ export class AuthService {
           targetType: 'USER',
           targetId: user.id,
           result: 'SUCCESS',
-        }
-      })
+        },
+      }),
+      prisma.auditLog.create({
+        data: {
+          actorUserId: user.id,
+          actorRole: user.role,
+          companyId: user.companyId,
+          action: 'AUTH_PASSWORD_CHANGED',
+          targetType: 'USER',
+          targetId: user.id,
+          result: 'SUCCESS',
+          reason: 'via_password_reset',
+        },
+      }),
     ]);
 
-    return { message: 'Contraseña actualizada exitosamente' };
+    return {
+      message: 'Contraseña actualizada correctamente. Ya puedes iniciar sesión.',
+    };
   }
 }

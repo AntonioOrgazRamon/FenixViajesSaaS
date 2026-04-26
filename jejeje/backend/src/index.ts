@@ -17,6 +17,8 @@ import auditLogRoutes from './modules/audit-logs/audit-log.routes';
 import leadRoutes from './modules/leads/lead.routes';
 import publicRoutes from './modules/public/public.routes';
 import profileRoutes from './modules/profile/profile.routes';
+import travelDocumentRoutes from './modules/travel/document.routes';
+import travelTripRoutes from './modules/travel/trip.routes';
 import { apiDocs } from './api-docs';
 
 const app = express();
@@ -46,6 +48,8 @@ app.use('/api/v1/superadmin/companies', companyRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/sessions', sessionRoutes);
 app.use('/api/v1/audit-logs', auditLogRoutes);
+app.use('/api/v1/travel/documents', travelDocumentRoutes);
+app.use('/api/v1/travel/trips', travelTripRoutes);
 
 // Manejo de errores global
 app.use(errorHandler);

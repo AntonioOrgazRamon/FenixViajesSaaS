@@ -1,75 +1,85 @@
 import bcrypt from 'bcrypt';
-import fs from 'fs';
-import path from 'path';
 import type { Express } from 'express';
 import prisma from '../../infrastructure/db';
-import { config } from '../../common/config';
 import { ConflictError, UnauthorizedError, ValidationError } from '../../common/errors/AppError';
 import type { z } from 'zod';
-import type { updateProfileExtendedSchema, changeEmailSchema } from './profile.schema';
+import type { updateProfileExtendedSchema, changeEmailSchema, patchDefaultAvatarSchema } from './profile.schema';
 import { Prisma, Theme } from '@prisma/client';
+import {
+  buildClientAvatar,
+  legacyAvatarUrlFrom,
+  LOCAL_AVATAR_PREFIX,
+  mapClientShapeToPrisma,
+  unlinkLocalAvatarIfAny,
+} from './avatar-helpers';
 
 type UpdateExtended = z.infer<typeof updateProfileExtendedSchema>;
 type ChangeEmail = z.infer<typeof changeEmailSchema>;
+type PatchDefault = z.infer<typeof patchDefaultAvatarSchema>;
 
-const LOCAL_AVATAR_PREFIX = '/uploads/avatars/';
+export { toPublicAvatarUrl, buildClientAvatar } from './avatar-helpers';
 
-export function toPublicAvatarUrl(stored: string | null): string | null {
-  if (!stored) return null;
-  if (stored.startsWith('http://') || stored.startsWith('https://')) return stored;
-  const base = config.PUBLIC_URL.replace(/\/$/, '');
-  const p = stored.startsWith('/') ? stored : `/${stored}`;
-  return `${base}${p}`;
+const profileSelect = {
+  id: true,
+  email: true,
+  firstName: true,
+  lastName: true,
+  phone: true,
+  locale: true,
+  timezone: true,
+  role: true,
+  companyId: true,
+  avatarUrl: true,
+  avatarType: true,
+  avatarBackgroundColor: true,
+  avatarTextColor: true,
+  avatarInitials: true,
+  avatarShape: true,
+  theme: true,
+  googleId: true,
+  authProvider: true,
+} as const;
+
+type ProfileRow = Prisma.UserGetPayload<{ select: typeof profileSelect }>;
+
+function mapToClient(user: ProfileRow) {
+  const avatar = buildClientAvatar(user);
+  return {
+    id: user.id,
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    phone: user.phone,
+    locale: user.locale,
+    timezone: user.timezone,
+    role: user.role,
+    companyId: user.companyId,
+    avatar,
+    avatar_url: legacyAvatarUrlFrom(avatar),
+    language: user.locale === 'en' ? 'en' : 'es',
+    theme: user.theme,
+    has_google_linked: !!user.googleId,
+    auth_provider: user.authProvider,
+  };
 }
 
-function unlinkLocalAvatarIfAny(stored: string | null) {
-  if (!stored || stored.startsWith('http://') || stored.startsWith('https://')) return;
-  if (!stored.startsWith(LOCAL_AVATAR_PREFIX)) return;
-  const rel = stored.replace(/^\//, '');
-  const full = path.join(process.cwd(), rel);
-  fs.unlink(full, () => {});
+function normalizeInitialsForDb(s: string | null | undefined): string | null {
+  if (s == null) return null;
+  const t = s.trim();
+  if (!t) return null;
+  const u = t.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!u) return null;
+  return u.slice(0, 3);
 }
 
 export class ProfileService {
   async getProfile(userId: string) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
-        locale: true,
-        timezone: true,
-        role: true,
-        companyId: true,
-        avatarUrl: true,
-        theme: true,
-        googleId: true,
-        authProvider: true,
-      },
+      select: profileSelect,
     });
     if (!user) throw new UnauthorizedError();
-
-    const language = user.locale === 'en' ? 'en' : 'es';
-
-    return {
-      id: user.id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      phone: user.phone,
-      locale: user.locale,
-      timezone: user.timezone,
-      role: user.role,
-      companyId: user.companyId,
-      avatar_url: toPublicAvatarUrl(user.avatarUrl),
-      language,
-      theme: user.theme,
-      has_google_linked: !!user.googleId,
-      auth_provider: user.authProvider,
-    };
+    return mapToClient(user);
   }
 
   async updateProfile(userId: string, data: UpdateExtended) {
@@ -92,41 +102,10 @@ export class ProfileService {
     const user = await prisma.user.update({
       where: { id: userId },
       data: update,
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
-        locale: true,
-        timezone: true,
-        avatarUrl: true,
-        theme: true,
-        googleId: true,
-        authProvider: true,
-        role: true,
-        companyId: true,
-      },
+      select: profileSelect,
     });
 
-    const language = user.locale === 'en' ? 'en' : 'es';
-
-    return {
-      id: user.id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      phone: user.phone,
-      locale: user.locale,
-      timezone: user.timezone,
-      role: user.role,
-      companyId: user.companyId,
-      avatar_url: toPublicAvatarUrl(user.avatarUrl),
-      language,
-      theme: user.theme,
-      has_google_linked: !!user.googleId,
-      auth_provider: user.authProvider,
-    };
+    return mapToClient(user);
   }
 
   async changeEmail(userId: string, data: ChangeEmail) {
@@ -161,28 +140,6 @@ export class ProfileService {
     return { email: data.new_email };
   }
 
-  async setAvatarUrl(userId: string, avatarUrl: string) {
-    const prev = await prisma.user.findUnique({ where: { id: userId }, select: { avatarUrl: true } });
-    unlinkLocalAvatarIfAny(prev?.avatarUrl ?? null);
-
-    await prisma.user.update({
-      where: { id: userId },
-      data: { avatarUrl },
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        actorUserId: userId,
-        action: 'PROFILE_AVATAR_UPDATED',
-        targetType: 'USER',
-        targetId: userId,
-        result: 'SUCCESS',
-      },
-    });
-
-    return { avatar_url: toPublicAvatarUrl(avatarUrl) };
-  }
-
   async setAvatarFromFile(userId: string, file: Express.Multer.File) {
     const prev = await prisma.user.findUnique({ where: { id: userId }, select: { avatarUrl: true } });
     unlinkLocalAvatarIfAny(prev?.avatarUrl ?? null);
@@ -191,7 +148,7 @@ export class ProfileService {
 
     await prisma.user.update({
       where: { id: userId },
-      data: { avatarUrl: relativePath },
+      data: { avatarType: 'UPLOADED', avatarUrl: relativePath },
     });
 
     await prisma.auditLog.create({
@@ -205,7 +162,40 @@ export class ProfileService {
       },
     });
 
-    return { avatar_url: toPublicAvatarUrl(relativePath) };
+    return this.getProfile(userId);
+  }
+
+  /**
+   * Solo colores, iniciales y forma “de reserva”. Nunca toca avatarUrl ni avatarType: quitar imagen = DELETE /profile/avatar.
+   */
+  async patchDefaultAvatar(userId: string, data: PatchDefault) {
+    const prev = await prisma.user.findUnique({ where: { id: userId } });
+    if (!prev) throw new UnauthorizedError();
+
+    const prefs = {
+      avatarInitials: normalizeInitialsForDb(data.initials),
+      avatarBackgroundColor: data.backgroundColor,
+      avatarTextColor: data.textColor,
+      avatarShape: mapClientShapeToPrisma(data.shape),
+    };
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: prefs,
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        actorUserId: userId,
+        action: 'PROFILE_AVATAR_UPDATED',
+        targetType: 'USER',
+        targetId: userId,
+        result: 'SUCCESS',
+        metadata: { source: 'default' } as Prisma.InputJsonValue,
+      },
+    });
+
+    return this.getProfile(userId);
   }
 
   async deleteAvatar(userId: string) {
@@ -214,7 +204,7 @@ export class ProfileService {
 
     await prisma.user.update({
       where: { id: userId },
-      data: { avatarUrl: null },
+      data: { avatarType: 'DEFAULT', avatarUrl: null },
     });
 
     await prisma.auditLog.create({
@@ -228,6 +218,6 @@ export class ProfileService {
       },
     });
 
-    return { avatar_url: null as string | null };
+    return this.getProfile(userId);
   }
 }

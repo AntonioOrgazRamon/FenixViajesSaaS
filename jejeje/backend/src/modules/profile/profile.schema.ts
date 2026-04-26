@@ -14,6 +14,20 @@ export const changeEmailSchema = z.object({
   password: z.string().min(1),
 });
 
-export const avatarBodySchema = z.object({
-  avatarUrl: z.string().url().max(500),
+const hexColor = z
+  .string()
+  .regex(
+    /^#[0-9A-Fa-f]{6}$/,
+    'Color en formato #RRGGBB'
+  );
+
+export const patchDefaultAvatarSchema = z.object({
+  initials: z
+    .string()
+    .max(3, 'Máximo 3 caracteres')
+    .optional()
+    .nullable(),
+  backgroundColor: hexColor,
+  textColor: hexColor,
+  shape: z.enum(['circle', 'rounded', 'square']),
 });

@@ -2,6 +2,15 @@ import { create } from 'zustand';
 
 export type AppRole = 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'COMPANY_USER';
 
+export type UserAvatar = {
+  type: 'uploaded' | 'default';
+  url: string | null;
+  initials: string;
+  backgroundColor: string;
+  textColor: string;
+  shape: 'circle' | 'rounded' | 'square';
+};
+
 export interface AuthUser {
   id: string;
   email: string;
@@ -12,7 +21,9 @@ export interface AuthUser {
   phone?: string | null;
   locale?: string | null;
   timezone?: string | null;
+  /** Compat: misma URL pública que `avatar.url` si la foto es subida */
   avatar_url?: string | null;
+  avatar?: UserAvatar | null;
   language?: 'es' | 'en';
   theme?: 'LIGHT' | 'DARK' | 'SYSTEM';
   has_google_linked?: boolean;

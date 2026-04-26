@@ -16,9 +16,26 @@ export class CompanyController {
   }
 
   async findAll(req: Request, res: Response) {
-    const page = parseInt(req.query.page as string) || 1;
-    const pageSize = parseInt(req.query.pageSize as string) || 10;
-    const result = await companyService.findAll(page, pageSize);
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string) || 10));
+    const q = (req.query.q as string) || (req.query.search as string) || undefined;
+    const status = (req.query.status as string) || undefined;
+
+    const num = (k: string) => {
+      const v = req.query[k];
+      if (v == null || v === '') return undefined;
+      const n = parseInt(String(v), 10);
+      return Number.isFinite(n) && n >= 0 ? n : undefined;
+    };
+
+    const result = await companyService.findAll(page, pageSize, {
+      q: typeof q === 'string' ? q : undefined,
+      status,
+      leadsMin: num('leadsMin'),
+      leadsMax: num('leadsMax'),
+      usersMin: num('usersMin'),
+      usersMax: num('usersMax'),
+    });
     res.json({ success: true, data: result });
   }
 

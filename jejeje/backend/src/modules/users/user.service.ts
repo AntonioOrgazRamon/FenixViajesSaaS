@@ -1,12 +1,45 @@
 import bcrypt from 'bcrypt';
+import { Prisma, Role, UserStatus } from '@prisma/client';
 import prisma from '../../infrastructure/db';
 import { NotFoundError, ValidationError, ForbiddenError } from '../../common/errors/AppError';
 
+const roleValues = new Set<Role>(Object.values(Role));
+const statusValues = new Set<UserStatus>(Object.values(UserStatus));
+
+function parseFilterRole(s: string | undefined): Role | undefined {
+  if (!s || s.trim() === '') return undefined;
+  const u = s.trim() as Role;
+  return roleValues.has(u) ? u : undefined;
+}
+
+function parseFilterStatus(s: string | undefined): UserStatus | undefined {
+  if (!s || s.trim() === '') return undefined;
+  const u = s.trim() as UserStatus;
+  return statusValues.has(u) ? u : undefined;
+}
+
 export class UserService {
-  async getUsers(companyId?: string, role?: string, page = 1, pageSize = 10) {
-    const where: any = {};
+  async getUsers(
+    companyId: string | undefined,
+    options: { role?: string; status?: string; q?: string; page: number; pageSize: number },
+  ) {
+    const { q, page, pageSize } = options;
+    const r = parseFilterRole(options.role);
+    const st = parseFilterStatus(options.status);
+
+    const where: Prisma.UserWhereInput = {};
     if (companyId) where.companyId = companyId;
-    if (role) where.role = role;
+    if (r) where.role = r;
+    if (st) where.status = st;
+
+    const t = (q || '').trim();
+    if (t) {
+      where.OR = [
+        { email: { contains: t } },
+        { firstName: { contains: t } },
+        { lastName: { contains: t } },
+      ];
+    }
 
     const skip = (page - 1) * pageSize;
     const [total, data] = await Promise.all([
@@ -15,10 +48,21 @@ export class UserService {
         where,
         skip,
         take: pageSize,
+        orderBy: { createdAt: 'desc' },
         select: {
-          id: true, email: true, firstName: true, lastName: true, role: true, status: true, companyId: true, createdAt: true
-        }
-      })
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          status: true,
+          companyId: true,
+          createdAt: true,
+          company: {
+            select: { id: true, name: true, slug: true },
+          },
+        },
+      }),
     ]);
 
     return { total, page, pageSize, data };

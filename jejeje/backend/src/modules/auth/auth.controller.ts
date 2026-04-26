@@ -69,7 +69,11 @@ export class AuthController {
     const parsed = requestPasswordResetSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError(parsed.error.issues[0].message);
 
-    const result = await authService.requestPasswordReset(parsed.data.email);
+    const result = await authService.requestPasswordReset(
+      parsed.data.email,
+      req.ip,
+      req.get('user-agent') || undefined
+    );
     res.json({ success: true, data: result });
   }
 
@@ -85,7 +89,11 @@ export class AuthController {
     const parsed = resetPasswordSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError(parsed.error.issues[0].message);
 
-    const result = await authService.resetPassword(parsed.data.token, parsed.data.newPassword);
+    const result = await authService.resetPassword(
+      parsed.data.token,
+      parsed.data.newPassword,
+      parsed.data.confirmPassword
+    );
     res.json({ success: true, data: result });
   }
 }

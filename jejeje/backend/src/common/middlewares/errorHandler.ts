@@ -13,7 +13,7 @@ export const errorHandler = (
     if (err.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({
         success: false,
-        error: { code: 'FILE_TOO_LARGE', message: 'La imagen supera el tamaño máximo (2 MB)' },
+        error: { code: 'FILE_TOO_LARGE', message: 'La imagen no puede superar los 2 MB.' },
       });
     }
     return res.status(400).json({
@@ -22,10 +22,14 @@ export const errorHandler = (
     });
   }
 
-  if (err.message === 'Tipo de imagen no permitido') {
+  if (
+    err.message === 'Tipo de imagen no permitido' ||
+    err.message?.includes('Formato de imagen no permitido') ||
+    err.message?.includes('JPG, PNG o WebP')
+  ) {
     return res.status(400).json({
       success: false,
-      error: { code: 'INVALID_FILE_TYPE', message: err.message },
+      error: { code: 'INVALID_FILE_TYPE', message: 'Formato no válido. Usa JPG, PNG o WebP.' },
     });
   }
 

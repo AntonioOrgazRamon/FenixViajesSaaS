@@ -63,6 +63,27 @@ export const apiDocs = {
           locale: "string (opcional)",
           timezone: "string (opcional)"
         }
+      },
+      {
+        method: "POST",
+        path: "/api/v1/auth/forgot-password",
+        description: "Solicita enlace de restablecimiento. Misma respuesta aunque el email no exista (anti enumeración).",
+        authRequired: false,
+        body: { email: "string" }
+      },
+      {
+        method: "POST",
+        path: "/api/v1/auth/verify-reset-token",
+        description: "Comprueba si el token del enlace es válido (un solo uso, no caducado).",
+        authRequired: false,
+        body: { token: "string" }
+      },
+      {
+        method: "POST",
+        path: "/api/v1/auth/reset-password",
+        description: "Establece contraseña nueva con el token del enlace. Revoca sesiones existentes del usuario.",
+        authRequired: false,
+        body: { token: "string", newPassword: "string", confirmPassword: "string" }
       }
     ],
     companies: [
@@ -123,6 +144,65 @@ export const apiDocs = {
         authRequired: true,
         roles: ["SUPER_ADMIN"],
         body: { reason: "string (opcional)" }
+      }
+    ],
+    travelCatalog: [
+      {
+        method: "POST",
+        path: "/api/v1/travel/documents/upload",
+        description:
+          "Sube un PDF de catálogo. SUPER_ADMIN debe enviar `companyId` (multipart: file, field companyId).",
+        authRequired: true,
+        roles: ["COMPANY_ADMIN", "SUPER_ADMIN"]
+      },
+      {
+        method: "POST",
+        path: "/api/v1/travel/documents/:id/process",
+        description: "Inicia el pipeline (extracción → segmentación → IA → importación) en segundo plano. Devuelve jobId (202).",
+        authRequired: true,
+        roles: ["COMPANY_ADMIN", "SUPER_ADMIN"]
+      },
+      {
+        method: "DELETE",
+        path: "/api/v1/travel/documents/:id",
+        description:
+          "Borra un PDF, sus viajes y jobs; elimina el fichero en disco y el JSON extraído. SUPER_ADMIN: query `companyId`.",
+        authRequired: true,
+        roles: ["COMPANY_ADMIN", "SUPER_ADMIN"]
+      },
+      {
+        method: "POST",
+        path: "/api/v1/travel/documents/clear",
+        description:
+          "Vacia importaciones: todos los PDFs de la empresa, viajes con `documentId` (importados) y jobs. Conserva viajes manuales sin documento. SUPER_ADMIN: query `companyId`.",
+        authRequired: true,
+        roles: ["COMPANY_ADMIN", "SUPER_ADMIN"]
+      },
+      {
+        method: "GET",
+        path: "/api/v1/travel/trips",
+        description: "Lista viajes. COMPANY_USER solo ve APPROVED. Admin puede filtrar `?status=`.",
+        authRequired: true
+      },
+      {
+        method: "GET",
+        path: "/api/v1/travel/trips/search",
+        description: "Búsqueda (solo viajes aprobados). Filtros: q, country, minDays, maxDays, minPrice, maxPrice.",
+        authRequired: true
+      },
+      {
+        method: "POST",
+        path: "/api/v1/travel/trips/manual",
+        description: "Crea un viaje manual a partir de JSON (mismo esquema de extracción IA).",
+        authRequired: true,
+        roles: ["COMPANY_ADMIN", "SUPER_ADMIN"]
+      },
+      {
+        method: "POST",
+        path: "/api/v1/travel/trips/:id/approve",
+        description: "Marca un viaje como aprobado para búsqueda y propuestas.",
+        authRequired: true,
+        roles: ["COMPANY_ADMIN", "SUPER_ADMIN"]
       }
     ]
   }

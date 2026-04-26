@@ -43,6 +43,7 @@ import { CompanyUserSessionsPage } from './features/app/pages/CompanyUserSession
 import { AppHomePage } from './features/app/pages/AppHomePage';
 import { LeadsListPage } from './features/leads/pages/LeadsListPage';
 import { LeadDetailPage } from './features/leads/pages/LeadDetailPage';
+import { TravelCatalogPage } from './features/travel/pages/TravelCatalogPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -73,7 +74,7 @@ function App() {
             <Route element={<GuestRoute />}>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-              <Route path="/reset-password" element={<ResetPasswordPage />} />
+              <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
             </Route>
 
             <Route path="/session-expired" element={<SessionExpiredPage />} />
@@ -102,19 +103,35 @@ function App() {
                   <Route path="/superadmin/users/:id/edit" element={<SuperUserEditPage />} />
                   <Route path="/superadmin/users/:id/sessions" element={<SuperUserSessionsPage />} />
                   <Route path="/superadmin/audit-logs" element={<SuperAuditLogsPage />} />
+                  <Route path="/superadmin/travel" element={<TravelCatalogPage />} />
                 </Route>
 
                 <Route element={<RequireRole roles={['COMPANY_ADMIN', 'COMPANY_USER']} />}>
                   <Route path="/leads" element={<LeadsListPage />} />
                   <Route path="/leads/:id" element={<LeadDetailPage />} />
+                  <Route path="/app/users" element={<CompanyUsersListPage />} />
+                  <Route
+                    path="/app/users/new"
+                    element={
+                      <RequireRole roles={['COMPANY_ADMIN']}>
+                        <CompanyUserNewPage />
+                      </RequireRole>
+                    }
+                  />
+                  <Route
+                    path="/app/admins/new"
+                    element={
+                      <RequireRole roles={['COMPANY_ADMIN']}>
+                        <CompanyAdminNewPage />
+                      </RequireRole>
+                    }
+                  />
+                  <Route path="/app/users/:id" element={<CompanyUserDetailPage />} />
                 </Route>
 
                 <Route element={<RequireRole roles={['COMPANY_ADMIN']} />}>
                   <Route path="/app/dashboard" element={<CompanyDashboardPage />} />
-                  <Route path="/app/users" element={<CompanyUsersListPage />} />
-                  <Route path="/app/users/new" element={<CompanyUserNewPage />} />
-                  <Route path="/app/admins/new" element={<CompanyAdminNewPage />} />
-                  <Route path="/app/users/:id" element={<CompanyUserDetailPage />} />
+                  <Route path="/app/travel" element={<TravelCatalogPage />} />
                   <Route path="/app/users/:id/edit" element={<CompanyUserEditPage />} />
                   <Route path="/app/users/:id/sessions" element={<CompanyUserSessionsPage />} />
                   <Route path="/app/audit-logs" element={<CompanyAuditLogsPage />} />
