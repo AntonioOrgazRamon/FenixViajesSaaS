@@ -1,13 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../../../lib/axios';
 import { unwrap } from '../../../lib/api';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { PanelCard } from '../../../components/ui/PanelCard';
 import type { LeadListItem } from '../../../types/domain';
 import { cn } from '../../../lib/cn';
-import { appInputBorder, appSelect } from '../../../lib/appTable';
+import { appFilterLabel, appInputBorder, appInputFilter, appSelectFilter } from '../../../lib/appTable';
 
 type ListResponse = {
   items: LeadListItem[];
@@ -29,13 +29,38 @@ const statusLabels: Record<string, string> = {
 
 export function LeadsListPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const assignedUserId = searchParams.get('assigned_user_id')?.trim() ?? '';
+  const createdByUserId = searchParams.get('created_by_user_id')?.trim() ?? '';
+
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<string>('');
   const pageSize = 20;
 
+  useEffect(() => {
+    setPage(1);
+  }, [assignedUserId, createdByUserId]);
+
+  const clearUserFilters = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('assigned_user_id');
+    next.delete('created_by_user_id');
+    setSearchParams(next, { replace: true });
+    setPage(1);
+  };
+
+  const userFilterSummary =
+    assignedUserId && createdByUserId
+      ? 'Filtros de usuario: asignado y creador.'
+      : assignedUserId
+        ? 'Mostrando leads asignados a este usuario.'
+        : createdByUserId
+          ? 'Mostrando leads creados por este usuario.'
+          : '';
+
   const query = useQuery<ListResponse>({
-    queryKey: ['leads', page, search, status],
+    queryKey: ['leads', page, search, status, assignedUserId, createdByUserId],
     queryFn: async () => {
       const params = new URLSearchParams({
         page: String(page),
@@ -45,6 +70,8 @@ export function LeadsListPage() {
       });
       if (search.trim()) params.set('search', search.trim());
       if (status) params.set('status', status);
+      if (assignedUserId) params.set('assigned_user_id', assignedUserId);
+      if (createdByUserId) params.set('created_by_user_id', createdByUserId);
       const { data } = await api.get<{ success: boolean; data: ListResponse }>(`/leads?${params.toString()}`);
       return unwrap(data);
     },
@@ -64,42 +91,60 @@ export function LeadsListPage() {
         description="Captación y seguimiento de oportunidades de tu empresa (multi-tenant)."
       />
 
-      <PanelCard className="mb-6" padding="p-4 sm:p-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-          <div className="min-w-[200px] flex-1">
-            <label className="text-xs text-zinc-600 dark:text-zinc-500">Buscar</label>
-            <input
-              className={cn(
-                'mt-1 w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-400/25',
-                'border border-zinc-300 bg-white text-zinc-900',
-                'dark:border-white/10 dark:bg-black/30 dark:text-zinc-100',
-              )}
-              placeholder="Nombre, email, teléfono…"
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(1);
-              }}
-            />
-          </div>
-          <div className="min-w-[160px]">
-            <label className="text-xs text-zinc-600 dark:text-zinc-500">Estado</label>
-            <select
-              className={cn(appSelect, 'mt-1 w-full outline-none focus:ring-2 focus:ring-amber-400/25')}
-              value={status}
-              onChange={(e) => {
-                setStatus(e.target.value);
-                setPage(1);
-              }}
-            >
-              <option value="">Todos</option>
-              {Object.entries(statusLabels).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
-                </option>
-              ))}
-            </select>
-          </div>
+      {userFilterSummary ? (
+        <div
+          className="mb-4 flex flex-col gap-3 rounded-xl border border-amber-200/80 bg-amber-50/90 px-4 py-3 text-sm text-amber-950 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-50 sm:flex-row sm:items-center sm:justify-between"
+          role="status"
+        >
+          <p className="min-w-0 leading-snug">{userFilterSummary}</p>
+          <button
+            type="button"
+            onClick={clearUserFilters}
+            className="shrink-0 rounded-lg border border-amber-300/80 bg-white/90 px-3 py-1.5 text-xs font-semibold text-amber-900 shadow-sm hover:bg-white dark:border-amber-400/30 dark:bg-zinc-900/80 dark:text-amber-100 dark:hover:bg-zinc-900"
+          >
+            Quitar filtro de usuario
+          </button>
+        </div>
+      ) : null}
+
+      <PanelCard className="mb-4" padding="p-2.5 sm:p-3.5">
+        <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-end sm:gap-2.5">
+            <div className="min-w-0 flex-1 sm:min-w-0 sm:max-w-sm">
+              <label className={appFilterLabel} htmlFor="ld-search">
+                Buscar
+              </label>
+              <input
+                id="ld-search"
+                className={appInputFilter}
+                placeholder="Nombre, email, teléfono…"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
+              />
+            </div>
+            <div className="w-full min-w-0 sm:w-40 sm:flex-none">
+              <label className={appFilterLabel} htmlFor="ld-st">
+                Estado
+              </label>
+              <select
+                id="ld-st"
+                className={appSelectFilter}
+                value={status}
+                onChange={(e) => {
+                  setStatus(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="">Todos</option>
+                {Object.entries(statusLabels).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+            </div>
         </div>
       </PanelCard>
 
@@ -110,7 +155,9 @@ export function LeadsListPage() {
         )}
         {!query.isLoading && !query.isError && rows.length === 0 && (
           <p className="p-6 text-sm text-zinc-500">
-            {search.trim() || status ? 'Sin resultados con los filtros actuales.' : 'Aún no hay leads.'}
+            {search.trim() || status || assignedUserId || createdByUserId
+              ? 'Sin resultados con los filtros actuales.'
+              : 'Aún no hay leads.'}
           </p>
         )}
         {!query.isLoading && rows.length > 0 && (

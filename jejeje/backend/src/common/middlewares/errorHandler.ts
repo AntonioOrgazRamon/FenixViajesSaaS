@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { AppError } from '../errors/AppError';
 import { logger } from '../logger';
+import { config } from '../config';
 
 export const errorHandler = (
   err: Error,
@@ -11,9 +12,11 @@ export const errorHandler = (
 ) => {
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {
+      const configured = parseFloat(config.TRAVEL_PDF_MAX_MB || '150');
+      const maxMb = Number.isFinite(configured) ? Math.max(130, configured) : 130;
       return res.status(400).json({
         success: false,
-        error: { code: 'FILE_TOO_LARGE', message: 'La imagen no puede superar los 2 MB.' },
+        error: { code: 'FILE_TOO_LARGE', message: `El archivo supera el tamaño máximo (${maxMb} MB).` },
       });
     }
     return res.status(400).json({
@@ -50,7 +53,7 @@ export const errorHandler = (
     success: false,
     error: {
       code: 'INTERNAL_SERVER_ERROR',
-      message: 'Something went wrong',
+      message: 'Error interno del servidor',
     },
   });
 };

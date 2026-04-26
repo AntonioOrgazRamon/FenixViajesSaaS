@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import type { TripAiExtract } from './trip-ai.schemas';
+import { cleanRepeatedCatalogHeaders } from './trip-text-cleaning.service';
 
 /**
  * FASE 6 — Limpieza, normalización de nombres y desduplicado en memoria.
@@ -12,7 +13,9 @@ export class TripNormalizationService {
       provider: this.normalizeText(t.provider),
       season: this.normalizeText(t.season),
       mainDestination: this.normalizeText(t.mainDestination),
-      description: this.normalizeText(t.description),
+      description: this.normalizeText(
+        t.description != null && t.description !== '' ? cleanRepeatedCatalogHeaders(t.description) : t.description,
+      ),
       currency: t.currency
         ? (this.normalizeText(t.currency) || t.currency).slice(0, 3).toUpperCase()
         : null,

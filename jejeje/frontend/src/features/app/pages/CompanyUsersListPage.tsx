@@ -6,9 +6,12 @@ import { unwrap } from '../../../lib/api';
 import { useAuthStore } from '../../../store/authStore';
 import type { Paginated, UserListItem } from '../../../types/domain';
 import {
+  appFilterBar,
+  appFilterLabel,
   appInputBorder,
+  appInputFilter,
   appPageTitle,
-  appSelect,
+  appSelectFilter,
   appTableBody,
   appTableCellMuted,
   appTableCellSoft,
@@ -101,43 +104,54 @@ export function CompanyUsersListPage() {
         )}
       </div>
 
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-        <div className="min-w-0 sm:min-w-[200px] sm:max-w-md sm:flex-1">
-          <label className="text-xs text-zinc-500">Buscar (nombre o email)</label>
-          <input
-            className={cn('mt-1 w-full rounded-lg px-3 py-2 text-sm', appInputBorder)}
-            placeholder="Ej. juan, @gmail"
-            value={q}
-            onChange={(e) => setParams({ q: e.target.value, page: 1 })}
-          />
-        </div>
-        <div>
-          <label className="text-xs text-zinc-500">Rol</label>
-          <select
-            className={appSelect + ' w-full min-w-[160px]'}
-            value={role}
-            onChange={(e) => setParams({ role: e.target.value, page: 1 })}
-          >
-            {roleFilterOptions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="text-xs text-zinc-500">Estado</label>
-          <select
-            className={appSelect + ' w-full min-w-[130px]'}
-            value={status}
-            onChange={(e) => setParams({ status: e.target.value, page: 1 })}
-          >
-            {statusOptions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+      <div className={cn(appFilterBar, 'mt-4')}>
+        <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-end sm:gap-x-2.5 sm:gap-y-2">
+          <div className="min-w-0 flex-1 sm:min-w-0 sm:max-w-sm">
+            <label className={appFilterLabel} htmlFor="cu-q">
+              Buscar
+            </label>
+            <input
+              id="cu-q"
+              className={appInputFilter}
+              placeholder="Nombre, email…"
+              value={q}
+              onChange={(e) => setParams({ q: e.target.value, page: 1 })}
+            />
+          </div>
+          <div className="w-full min-w-0 sm:w-44 sm:flex-none">
+            <label className={appFilterLabel} htmlFor="cu-role">
+              Rol
+            </label>
+            <select
+              id="cu-role"
+              className={appSelectFilter}
+              value={role}
+              onChange={(e) => setParams({ role: e.target.value, page: 1 })}
+            >
+              {roleFilterOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="w-full min-w-0 sm:w-32 sm:flex-none">
+            <label className={appFilterLabel} htmlFor="cu-st">
+              Estado
+            </label>
+            <select
+              id="cu-st"
+              className={appSelectFilter}
+              value={status}
+              onChange={(e) => setParams({ status: e.target.value, page: 1 })}
+            >
+              {statusOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 

@@ -4,6 +4,8 @@ import { api } from '../../../lib/axios';
 import { unwrap } from '../../../lib/api';
 import { useAuthStore } from '../../../store/authStore';
 import type { UserDetail } from '../../../types/domain';
+import { appPageTitle } from '../../../lib/appTable';
+import { UserDetailPanel } from '../../users/components/UserDetailPanel';
 
 export function CompanyUserDetailPage() {
   const canManage = useAuthStore((s) => s.user?.role === 'COMPANY_ADMIN');
@@ -23,36 +25,28 @@ export function CompanyUserDetailPage() {
 
   return (
     <div>
-      <Link to="/app/users" className="text-sm text-amber-400 hover:underline">
+      <Link to="/app/users" className="text-sm font-medium text-amber-700 hover:underline dark:text-amber-400">
         ← Usuarios
       </Link>
-      <h1 className="mt-4 text-2xl font-semibold text-white">{data.email}</h1>
-      <p className="text-sm text-zinc-500">
-        {data.firstName} {data.lastName}
-      </p>
-      <dl className="mt-6 w-full space-y-2 text-sm">
-        <div className="flex justify-between border-b border-white/5 py-2">
-          <dt className="text-zinc-500">Rol</dt>
-          <dd className="text-zinc-200">{data.role}</dd>
-        </div>
-        <div className="flex justify-between border-b border-white/5 py-2">
-          <dt className="text-zinc-500">Estado</dt>
-          <dd className="text-zinc-200">{data.status}</dd>
-        </div>
-      </dl>
+      <h1 className={`${appPageTitle} mt-3`}>Ficha de usuario</h1>
+      <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-500">Datos del miembro de tu espacio (solo lectura).</p>
+
+      <div className="mt-4 w-full">
+        <UserDetailPanel
+          data={data}
+          showCompanyAdminLink={false}
+          leadsListBasePath="/leads"
+          sessionsHref={canManage ? `/app/users/${id}/sessions` : undefined}
+        />
+      </div>
+
       {canManage && (
-        <div className="mt-6 flex flex-wrap gap-3">
+        <div className="mt-4 flex w-full flex-wrap gap-3">
           <Link
             to={`/app/users/${id}/edit`}
-            className="rounded-lg border border-zinc-300 px-4 py-2 text-sm text-zinc-200 hover:bg-white/5 dark:border-white/15"
+            className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50 dark:border-white/15 dark:text-zinc-200 dark:hover:bg-white/5"
           >
             Editar
-          </Link>
-          <Link
-            to={`/app/users/${id}/sessions`}
-            className="rounded-lg border border-amber-500/30 px-4 py-2 text-sm text-amber-800 hover:bg-amber-500/10 dark:text-amber-200"
-          >
-            Sesiones
           </Link>
         </div>
       )}

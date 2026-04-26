@@ -173,6 +173,7 @@ export class LeadService {
     if (q.source) where.source = q.source;
     if (q.priority) where.priority = q.priority;
     if (q.assigned_user_id) where.assignedUserId = q.assigned_user_id;
+    if (q.created_by_user_id) where.createdByUserId = q.created_by_user_id;
 
     if (q.search?.trim()) {
       const s = q.search.trim();

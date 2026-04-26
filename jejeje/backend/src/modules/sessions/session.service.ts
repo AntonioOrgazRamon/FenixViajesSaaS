@@ -2,9 +2,9 @@ import prisma from '../../infrastructure/db';
 import { NotFoundError } from '../../common/errors/AppError';
 
 export class SessionService {
-  async getSessions(userId: string, page = 1, pageSize = 10) {
+  async getSessions(userId: string, currentSessionId: string, page = 1, pageSize = 10) {
     const skip = (page - 1) * pageSize;
-    const [total, data] = await Promise.all([
+    const [total, rows] = await Promise.all([
       prisma.session.count({ where: { userId } }),
       prisma.session.findMany({
         where: { userId },
@@ -20,11 +20,16 @@ export class SessionService {
           expiresAt: true,
           revokedAt: true,
         },
-        orderBy: { createdAt: 'desc' }
-      })
+        orderBy: { createdAt: 'desc' },
+      }),
     ]);
 
-    return { total, page, pageSize, data };
+    const data = rows.map((s) => ({
+      ...s,
+      isCurrent: s.id === currentSessionId,
+    }));
+
+    return { total, page, pageSize, currentSessionId, data };
   }
 
   async revokeSession(sessionId: string, userId: string, reason?: string) {
@@ -45,8 +50,23 @@ export class SessionService {
     return { message: 'Sesión revocada' };
   }
 
+  /**
+   * Revoca todas las sesiones activas del usuario excepto la indicada (normalmente la sesión del token).
+   */
+  async revokeOtherSessions(userId: string, keepSessionId: string) {
+    await prisma.session.updateMany({
+      where: {
+        userId,
+        id: { not: keepSessionId },
+        revokedAt: null,
+      },
+      data: { revokedAt: new Date(), revokedReason: 'USER_REVOKE_OTHERS' },
+    });
+    return { message: 'Se cerraron el resto de dispositivos activos.' };
+  }
+
   async revokeUserSessions(targetUserId: string, actorUserId: string, reason?: string) {
-    const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
+    const targetUser = await prisma.user.findUnique({ where: { id: targetUserId }, select: { id: true } });
     if (!targetUser) throw new NotFoundError('Usuario no encontrado');
 
     await prisma.session.updateMany({

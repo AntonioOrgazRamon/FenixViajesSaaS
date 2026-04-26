@@ -2,6 +2,8 @@ import OpenAI from 'openai';
 import { config } from '../../common/config';
 import { tripAiExtractZ, type TripAiExtract } from './trip-ai.schemas';
 import { logger } from '../../common/logger';
+import { cleanRepeatedCatalogHeaders } from './trip-text-cleaning.service';
+import { filterHotelsForPersistence } from './trip-hotels-extract.service';
 
 /**
  * FASE 5 — Convierte un bloque de texto de un viaje en JSON validado con Zod.
@@ -29,12 +31,13 @@ Reglas estrictas:
 - Los nombres de destinos deben copiarse del texto.
 - confidence: tu grado de confianza 0-1 en la calidad de la extracción.`;
 
+    const textForModel = cleanRepeatedCatalogHeaders(input.text).slice(0, 120_000);
     const user = `Título candidato: ${input.titleHint}
 Páginas aproximadas: ${input.pageStart}-${input.pageEnd}
 
 TEXTO:
 ---
-${input.text.slice(0, 120_000)}
+${textForModel}
 ---
 
 Responde con un único JSON con las claves:
@@ -68,7 +71,18 @@ observations: {text, order}.`;
         logger.warn({ issues: out.error.issues }, 'IA: JSON no valida esquema, fallback');
         return { data: fallbackExtraction(input), usedModel: true };
       }
-      return { data: out.data, usedModel: true };
+      const hClean = filterHotelsForPersistence(out.data.hotels);
+      const data: TripAiExtract = {
+        ...out.data,
+        hotels: hClean.kept.map((h, i) => ({ ...h, order: i })),
+      };
+      if (hClean.dropped.length > 0) {
+        logger.debug(
+          { nDropped: hClean.dropped.length, sample: hClean.dropped.slice(0, 8) },
+          'IA: hoteles filtrados (candidatos inválidos)',
+        );
+      }
+      return { data, usedModel: true };
     } catch (e) {
       logger.error(e, 'OpenAI extract error');
       return { data: fallbackExtraction(input), usedModel: false };
@@ -77,12 +91,13 @@ observations: {text, order}.`;
 }
 
 function fallbackExtraction(input: { titleHint: string; text: string }): TripAiExtract {
+  const forDesc = cleanRepeatedCatalogHeaders(input.text);
   return {
     title: input.titleHint.slice(0, 500) || 'Viaje (sin título)',
     provider: null,
     season: null,
     mainDestination: null,
-    description: input.text.slice(0, 8000) || null,
+    description: forDesc.slice(0, 8000) || null,
     durationDays: null,
     durationNights: null,
     indicativePrice: null,

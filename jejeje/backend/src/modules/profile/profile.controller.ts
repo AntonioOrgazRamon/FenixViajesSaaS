@@ -12,6 +12,12 @@ export class ProfileController {
     res.json({ success: true, data });
   }
 
+  async getActivity(req: Request, res: Response) {
+    if (!req.user) throw new ValidationError('No autenticado');
+    const data = await profileService.getAccountActivity(req.user.id);
+    res.json({ success: true, data });
+  }
+
   async patch(req: Request, res: Response) {
     if (!req.user) throw new ValidationError('No autenticado');
     const parsed = updateProfileExtendedSchema.safeParse(req.body);

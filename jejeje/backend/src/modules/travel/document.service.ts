@@ -9,10 +9,19 @@ import { TripImportService } from '../../services/travel/trip-import.service';
 const importService = new TripImportService();
 
 const allowedMime = 'application/pdf';
+const TRAVEL_MIN_UPLOAD_MB = 130;
 
 export class TravelDocumentService {
+  maxMb(): number {
+    const configured = parseFloat(config.TRAVEL_PDF_MAX_MB || '150');
+    if (!Number.isFinite(configured)) {
+      return TRAVEL_MIN_UPLOAD_MB;
+    }
+    return Math.max(TRAVEL_MIN_UPLOAD_MB, configured);
+  }
+
   maxBytes(): number {
-    return Math.floor(parseFloat(config.TRAVEL_PDF_MAX_MB || '80') * 1024 * 1024);
+    return Math.floor(this.maxMb() * 1024 * 1024);
   }
 
   async createFromUpload(input: {
@@ -30,7 +39,7 @@ export class TravelDocumentService {
     }
     if (input.size > this.maxBytes()) {
       throw new ValidationError(
-        `El PDF supera el tamaño máximo (${config.TRAVEL_PDF_MAX_MB} MB)`,
+        `El PDF supera el tamaño máximo (${this.maxMb()} MB)`,
       );
     }
 

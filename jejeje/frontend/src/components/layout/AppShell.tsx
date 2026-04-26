@@ -5,12 +5,10 @@ import {
   ClipboardList,
   FileText,
   Home,
-  KeyRound,
   LayoutDashboard,
   LogOut,
   Menu,
   Shield,
-  Smartphone,
   Target,
   UserCircle,
   UserPlus,
@@ -71,6 +69,20 @@ export function AppShell() {
     };
   }, [mobileOpen]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const media = window.matchMedia('(min-width: 1024px)');
+    const onChange = (event: MediaQueryListEvent) => {
+      if (event.matches) setMobileOpen(false);
+    };
+
+    // If we render directly on desktop with stale state, unlock immediately.
+    if (media.matches) setMobileOpen(false);
+
+    media.addEventListener('change', onChange);
+    return () => media.removeEventListener('change', onChange);
+  }, []);
+
   const handleLogout = async () => {
     try {
       await api.post('/auth/logout');
@@ -106,8 +118,6 @@ export function AppShell() {
     icon: typeof UserCircle;
   }[] = [
     { to: '/profile', label: 'Cuenta', end: true, icon: UserCircle },
-    { to: '/profile/password', label: 'Contraseña', icon: KeyRound },
-    { to: '/profile/sessions', label: 'Sesiones', icon: Smartphone },
   ];
 
   const roleLinks = (r: AppRole | undefined) => {
@@ -245,7 +255,7 @@ export function AppShell() {
           </div>
         </aside>
 
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <header
             className={cn(
               'sticky top-0 z-30 flex items-center justify-between gap-3 border-b px-4 py-3 backdrop-blur-md lg:hidden',
@@ -340,12 +350,12 @@ export function AppShell() {
             </div>
           </div>
 
-          <main className="relative flex-1 overflow-auto">
+          <main className="relative flex min-h-0 flex-1 flex-col">
             <div
               className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_85%_50%_at_50%_-15%,rgba(251,191,36,0.07),transparent)] opacity-70 dark:opacity-100"
               aria-hidden
             />
-            <div className="relative w-full min-w-0 max-w-none px-2 py-3 sm:px-3 sm:py-4 lg:px-4 lg:py-5">
+            <div className="relative flex min-h-0 min-w-0 max-w-none flex-1 flex-col overflow-y-auto overscroll-y-contain px-2 py-3 sm:px-3 sm:py-4 lg:px-4 lg:py-5">
               <Outlet />
             </div>
           </main>

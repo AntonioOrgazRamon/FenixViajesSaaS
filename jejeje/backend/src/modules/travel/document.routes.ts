@@ -4,7 +4,10 @@ import { requireAuth } from '../../common/middlewares/auth';
 import { TravelDocumentController } from './document.controller';
 import { config } from '../../common/config';
 
-const maxBytes = Math.floor(parseFloat(config.TRAVEL_PDF_MAX_MB || '80') * 1024 * 1024);
+const TRAVEL_MIN_UPLOAD_MB = 130;
+const configuredMb = parseFloat(config.TRAVEL_PDF_MAX_MB || '150');
+const maxMb = Number.isFinite(configuredMb) ? Math.max(TRAVEL_MIN_UPLOAD_MB, configuredMb) : TRAVEL_MIN_UPLOAD_MB;
+const maxBytes = Math.floor(maxMb * 1024 * 1024);
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: maxBytes },

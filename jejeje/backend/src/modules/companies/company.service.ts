@@ -18,7 +18,7 @@ export class CompanyService {
     const existingCompany = await prisma.company.findUnique({ where: { slug: company.slug } });
     if (existingCompany) throw new ConflictError('COMPANY_SLUG_ALREADY_EXISTS');
 
-    const existingUser = await prisma.user.findUnique({ where: { email: initialAdmin.email } });
+    const existingUser = await prisma.user.findUnique({ where: { email: initialAdmin.email }, select: { id: true } });
     if (existingUser) throw new ConflictError('EMAIL_ALREADY_EXISTS');
 
     const passwordHash = await bcrypt.hash(initialAdmin.password, 10);
@@ -146,9 +146,71 @@ export class CompanyService {
   }
 
   async findById(id: string) {
-    const company = await prisma.company.findUnique({ where: { id } });
+    const company = await prisma.company.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        suspendedAt: true,
+        deletedAt: true,
+      },
+    });
     if (!company) throw new NotFoundError('COMPANY_NOT_FOUND');
-    return company;
+
+    const [usersCount, leadsCount, activeSessionCount, lastUserCreatedAt, lastLeadCreatedAt, recentAudit] =
+      await Promise.all([
+        prisma.user.count({ where: { companyId: id, status: { not: 'DELETED' } } }),
+        prisma.lead.count({ where: { companyId: id, deletedAt: null } }),
+        prisma.session.count({
+          where: { companyId: id, revokedAt: null, expiresAt: { gt: new Date() } },
+        }),
+        prisma.user.findFirst({
+          where: { companyId: id },
+          orderBy: { createdAt: 'desc' },
+          select: { createdAt: true },
+        }),
+        prisma.lead.findFirst({
+          where: { companyId: id, deletedAt: null },
+          orderBy: { createdAt: 'desc' },
+          select: { createdAt: true },
+        }),
+        prisma.auditLog.findMany({
+          where: { OR: [{ companyId: id }, { targetCompanyId: id }] },
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+          select: {
+            id: true,
+            action: true,
+            result: true,
+            createdAt: true,
+            targetType: true,
+            targetId: true,
+            actorRole: true,
+          },
+        }),
+      ]);
+
+    return {
+      ...company,
+      usersCount,
+      leadsCount,
+      activeSessionCount,
+      lastUserCreatedAt: lastUserCreatedAt?.createdAt.toISOString() ?? null,
+      lastLeadCreatedAt: lastLeadCreatedAt?.createdAt.toISOString() ?? null,
+      recentAudit: recentAudit.map((a) => ({
+        id: a.id,
+        action: a.action,
+        result: a.result,
+        createdAt: a.createdAt.toISOString(),
+        targetType: a.targetType,
+        targetId: a.targetId,
+        actorRole: a.actorRole,
+      })),
+    };
   }
 
   async update(id: string, data: any, actorUserId: string) {

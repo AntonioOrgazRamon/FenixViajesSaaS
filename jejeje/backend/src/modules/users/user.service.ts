@@ -68,19 +68,132 @@ export class UserService {
     return { total, page, pageSize, data };
   }
 
-  async getUserById(id: string) {
+  /**
+   * @param viewer — si no es SUPER_ADMIN, la actividad de auditoría se limita a la empresa del visor.
+   */
+  async getUserById(
+    id: string,
+    viewer?: { role: string; companyId: string | null },
+  ) {
     const user = await prisma.user.findUnique({
       where: { id },
       select: {
-        id: true, email: true, firstName: true, lastName: true, role: true, status: true, companyId: true, phone: true, createdAt: true
-      }
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        displayName: true,
+        phone: true,
+        role: true,
+        status: true,
+        companyId: true,
+        locale: true,
+        timezone: true,
+        timeFormat: true,
+        dateFormat: true,
+        theme: true,
+        authProvider: true,
+        lastLoginAt: true,
+        createdAt: true,
+        updatedAt: true,
+        lockedUntil: true,
+        failedLoginAttempts: true,
+        avatarUrl: true,
+        avatarType: true,
+        avatarBackgroundColor: true,
+        avatarTextColor: true,
+        avatarInitials: true,
+        avatarShape: true,
+        company: {
+          select: { id: true, name: true, slug: true, status: true },
+        },
+      },
     });
     if (!user) throw new NotFoundError('Usuario no encontrado');
-    return user;
+
+    const scopeCompany =
+      viewer && viewer.role !== 'SUPER_ADMIN' && viewer.companyId ? viewer.companyId : null;
+
+    const auditWhere: Prisma.AuditLogWhereInput = {
+      AND: [
+        {
+          OR: [{ actorUserId: id }, { AND: [{ targetType: 'USER' }, { targetId: id }] }],
+        },
+        ...(scopeCompany
+          ? [{ OR: [{ companyId: scopeCompany }, { targetCompanyId: scopeCompany }] }]
+          : []),
+      ],
+    };
+
+    const [
+      activeSessionCount,
+      lastPwdAudit,
+      leadsAssignedCount,
+      leadsCreatedCount,
+      recentAudit,
+    ] = await Promise.all([
+      prisma.session.count({
+        where: {
+          userId: id,
+          revokedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+      }),
+      prisma.auditLog.findFirst({
+        where: { actorUserId: id, action: 'AUTH_PASSWORD_CHANGED' },
+        orderBy: { createdAt: 'desc' },
+        select: { createdAt: true },
+      }),
+      prisma.lead.count({
+        where: {
+          assignedUserId: id,
+          deletedAt: null,
+          ...(user.companyId ? { companyId: user.companyId } : {}),
+        },
+      }),
+      prisma.lead.count({
+        where: {
+          createdByUserId: id,
+          deletedAt: null,
+          ...(user.companyId ? { companyId: user.companyId } : {}),
+        },
+      }),
+      prisma.auditLog.findMany({
+        where: auditWhere,
+        orderBy: { createdAt: 'desc' },
+        take: 15,
+        select: {
+          id: true,
+          action: true,
+          result: true,
+          createdAt: true,
+          targetType: true,
+          targetId: true,
+          companyId: true,
+        },
+      }),
+    ]);
+
+    return {
+      ...user,
+      activeSessionCount,
+      lastPasswordChangeAt: lastPwdAudit?.createdAt.toISOString() ?? null,
+      leadsAssignedCount,
+      leadsCreatedCount,
+      recentAudit: recentAudit.map((a) => ({
+        id: a.id,
+        action: a.action,
+        result: a.result,
+        createdAt: a.createdAt.toISOString(),
+        targetType: a.targetType,
+        targetId: a.targetId,
+        companyId: a.companyId,
+      })),
+    };
   }
 
   async createUser(data: any, actorId: string) {
-    const existing = await prisma.user.findUnique({ where: { email: data.email } });
+    const existing = await prisma.user.findUnique({ where: { email: data.email }, select: { id: true } });
     if (existing) throw new ValidationError('El correo ya está en uso');
 
     const passwordHash = data.password 
@@ -110,11 +223,20 @@ export class UserService {
   }
 
   async updateUser(id: string, data: any, actorId: string) {
-    const user = await prisma.user.findUnique({ where: { id } });
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        status: true,
+        companyId: true,
+      },
+    });
     if (!user) throw new NotFoundError('Usuario no encontrado');
 
     if (data.email && data.email !== user.email) {
-      const existing = await prisma.user.findUnique({ where: { email: data.email } });
+      const existing = await prisma.user.findUnique({ where: { email: data.email }, select: { id: true } });
       if (existing) throw new ValidationError('El correo ya está en uso');
     }
 
@@ -153,7 +275,10 @@ export class UserService {
   }
 
   async deleteUser(id: string, actorId: string) {
-    const user = await prisma.user.findUnique({ where: { id } });
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: { id: true, role: true, companyId: true, status: true },
+    });
     if (!user) throw new NotFoundError('Usuario no encontrado');
 
     if (user.role === 'COMPANY_ADMIN') {

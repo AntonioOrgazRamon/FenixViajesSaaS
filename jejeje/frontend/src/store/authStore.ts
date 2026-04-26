@@ -11,6 +11,15 @@ export type UserAvatar = {
   shape: 'circle' | 'rounded' | 'square';
 };
 
+export type CompanyStatus = 'ACTIVE' | 'SUSPENDED' | 'DELETED';
+
+export type ProfilePreferencesClient = {
+  notifyProduct: boolean;
+  notifySecurity: boolean;
+  notifyBilling: boolean;
+  marketingOptIn: boolean;
+};
+
 export interface AuthUser {
   id: string;
   email: string;
@@ -18,9 +27,17 @@ export interface AuthUser {
   companyId?: string | null;
   firstName?: string | null;
   lastName?: string | null;
+  /** Nombre mostrado en la UI (opcional) */
+  displayName?: string | null;
   phone?: string | null;
   locale?: string | null;
   timezone?: string | null;
+  timeFormat?: '24h' | '12h' | null;
+  dateFormat?: 'dmy' | 'mdy' | 'ymd' | 'locale' | null;
+  company?: { id: string; name: string; status: CompanyStatus } | null;
+  accountStatus?: 'ACTIVE' | 'SUSPENDED' | 'LOCKED' | 'DELETED';
+  lastLoginAt?: string | null;
+  createdAt?: string;
   /** Compat: misma URL pública que `avatar.url` si la foto es subida */
   avatar_url?: string | null;
   avatar?: UserAvatar | null;
@@ -28,6 +45,10 @@ export interface AuthUser {
   theme?: 'LIGHT' | 'DARK' | 'SYSTEM';
   has_google_linked?: boolean;
   auth_provider?: string;
+  /** ISO; último cambio de contraseña (auditoría). */
+  lastPasswordChangeAt?: string | null;
+  /** Preferencias persistidas (notificaciones, etc.). */
+  profilePreferences?: ProfilePreferencesClient;
 }
 
 interface AuthState {

@@ -5,6 +5,31 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#09090b" />
+    <script>
+      (function () {
+        try {
+          var t = null;
+          try {
+            var v = localStorage.getItem('nc-theme');
+            if (v === 'DARK' || v === 'LIGHT' || v === 'SYSTEM') t = v;
+          } catch (e) {}
+          var d = false;
+          if (t === 'DARK') d = true;
+          else if (t === 'LIGHT') d = false;
+          else d = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var el = document.documentElement;
+          if (d) {
+            el.classList.add('dark');
+            el.style.colorScheme = 'dark';
+          } else {
+            el.classList.remove('dark');
+            el.style.colorScheme = 'light';
+          }
+          var m = document.querySelector('meta[name="theme-color"]');
+          if (m) m.setAttribute('content', d ? '#09090b' : '#fafafa');
+        } catch (e) {}
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

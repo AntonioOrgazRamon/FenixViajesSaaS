@@ -9,6 +9,7 @@ const c = new ProfileController();
 router.use(requireAuth);
 
 router.get('/', c.get.bind(c));
+router.get('/activity', c.getActivity.bind(c));
 router.patch('/', c.patch.bind(c));
 router.patch('/email', c.patchEmail.bind(c));
 router.post('/avatar/upload', uploadAvatarMiddleware.single('file'), c.postAvatarUpload.bind(c));

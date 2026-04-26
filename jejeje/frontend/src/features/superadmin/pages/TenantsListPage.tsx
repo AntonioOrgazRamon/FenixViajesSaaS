@@ -5,9 +5,12 @@ import { api } from '../../../lib/axios';
 import { unwrap } from '../../../lib/api';
 import type { Company, Paginated } from '../../../types/domain';
 import {
+  appFilterBar,
+  appFilterLabel,
   appInputBorder,
+  appInputFilter,
   appPageTitle,
-  appSelect,
+  appSelectFilter,
   appTableBody,
   appTableCellMuted,
   appTableCellSoft,
@@ -119,74 +122,86 @@ export function TenantsListPage() {
         </Link>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <div>
-          <label className="text-xs text-zinc-500">Nombre o slug (contiene)</label>
-          <input
-            className={cn('mt-1 w-full rounded-lg px-3 py-2 text-sm', appInputBorder)}
-            value={q}
-            placeholder="Ej. fenix, @…"
-            onChange={(e) => setFilters({ q: e.target.value })}
-          />
-        </div>
-        <div>
-          <label className="text-xs text-zinc-500">Estado</label>
-          <select
-            className={appSelect + ' mt-1 w-full'}
-            value={status}
-            onChange={(e) => setFilters({ status: e.target.value })}
-          >
-            {statusOptions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="text-xs text-zinc-500">Leads (mín. / máx.)</label>
-          <div className="mt-1 flex gap-2">
+      <div className={cn(appFilterBar, 'mt-3')}>
+        <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-end sm:gap-x-3 sm:gap-y-2">
+          <div className="min-w-0 flex-1 sm:min-w-0 sm:max-w-xs">
+            <label className={appFilterLabel} htmlFor="t-q">
+              Nombre o slug
+            </label>
             <input
-              className={cn('w-1/2 min-w-0 rounded-lg px-2 py-2 text-sm', appInputBorder)}
-              type="number"
-              min={0}
-              inputMode="numeric"
-              placeholder="Mín"
-              value={leadsMin}
-              onChange={(e) => setFilters({ leadsMin: e.target.value })}
-            />
-            <input
-              className={cn('w-1/2 min-w-0 rounded-lg px-2 py-2 text-sm', appInputBorder)}
-              type="number"
-              min={0}
-              inputMode="numeric"
-              placeholder="Máx"
-              value={leadsMax}
-              onChange={(e) => setFilters({ leadsMax: e.target.value })}
+              id="t-q"
+              className={appInputFilter}
+              value={q}
+              placeholder="p. ej. acme, slug…"
+              onChange={(e) => setFilters({ q: e.target.value })}
             />
           </div>
-        </div>
-        <div>
-          <label className="text-xs text-zinc-500">Usuarios (mín. / máx.)</label>
-          <div className="mt-1 flex gap-2">
-            <input
-              className={cn('w-1/2 min-w-0 rounded-lg px-2 py-2 text-sm', appInputBorder)}
-              type="number"
-              min={0}
-              inputMode="numeric"
-              placeholder="Mín"
-              value={usersMin}
-              onChange={(e) => setFilters({ usersMin: e.target.value })}
-            />
-            <input
-              className={cn('w-1/2 min-w-0 rounded-lg px-2 py-2 text-sm', appInputBorder)}
-              type="number"
-              min={0}
-              inputMode="numeric"
-              placeholder="Máx"
-              value={usersMax}
-              onChange={(e) => setFilters({ usersMax: e.target.value })}
-            />
+          <div className="w-full min-w-0 sm:w-28 sm:flex-none">
+            <label className={appFilterLabel} htmlFor="t-st">
+              Estado
+            </label>
+            <select
+              id="t-st"
+              className={appSelectFilter}
+              value={status}
+              onChange={(e) => setFilters({ status: e.target.value })}
+            >
+              {statusOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={appFilterLabel}>Leads</label>
+            <div className="flex gap-1.5">
+              <input
+                className={cn(appInputFilter, 'w-16 sm:w-20')}
+                type="number"
+                min={0}
+                inputMode="numeric"
+                placeholder="Mín"
+                value={leadsMin}
+                onChange={(e) => setFilters({ leadsMin: e.target.value })}
+                aria-label="Leads mínimo"
+              />
+              <input
+                className={cn(appInputFilter, 'w-16 sm:w-20')}
+                type="number"
+                min={0}
+                inputMode="numeric"
+                placeholder="Máx"
+                value={leadsMax}
+                onChange={(e) => setFilters({ leadsMax: e.target.value })}
+                aria-label="Leads máximo"
+              />
+            </div>
+          </div>
+          <div>
+            <label className={appFilterLabel}>Usuarios</label>
+            <div className="flex gap-1.5">
+              <input
+                className={cn(appInputFilter, 'w-16 sm:w-20')}
+                type="number"
+                min={0}
+                inputMode="numeric"
+                placeholder="Mín"
+                value={usersMin}
+                onChange={(e) => setFilters({ usersMin: e.target.value })}
+                aria-label="Usuarios mínimo"
+              />
+              <input
+                className={cn(appInputFilter, 'w-16 sm:w-20')}
+                type="number"
+                min={0}
+                inputMode="numeric"
+                placeholder="Máx"
+                value={usersMax}
+                onChange={(e) => setFilters({ usersMax: e.target.value })}
+                aria-label="Usuarios máximo"
+              />
+            </div>
           </div>
         </div>
       </div>

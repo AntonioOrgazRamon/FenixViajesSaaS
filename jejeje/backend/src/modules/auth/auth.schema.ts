@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { validateNewPasswordForReset } from '../../common/validation/passwordPolicy';
+import { updateProfileExtendedSchema } from '../profile/profile.schema';
 
 export const loginSchema = z.object({
   email: z.string().email(),
@@ -20,14 +21,8 @@ export const changePasswordSchema = z.object({
   path: ["confirmPassword"],
 });
 
-export const updateProfileSchema = z.object({
-  firstName: z.string().min(2).optional(),
-  lastName: z.string().min(2).optional(),
-  phone: z.string().optional(),
-  locale: z.enum(['es', 'en']).optional(),
-  timezone: z.string().optional(),
-  theme: z.enum(['LIGHT', 'DARK', 'SYSTEM']).optional(),
-});
+/** Misma regla de negocio que `PATCH /api/v1/profile` (módulo profile). */
+export const updateProfileSchema = updateProfileExtendedSchema;
 
 export const requestPasswordResetSchema = z.object({
   email: z.string().email(),

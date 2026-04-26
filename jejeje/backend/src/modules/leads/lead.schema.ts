@@ -50,6 +50,7 @@ export const listLeadsQuerySchema = z.object({
   status: leadStatusEnum.optional(),
   source: leadSourceEnum.optional(),
   assigned_user_id: z.string().uuid().optional(),
+  created_by_user_id: z.string().uuid().optional(),
   priority: leadPriorityEnum.optional(),
   sort_by: z.enum(['created_at', 'updated_at', 'status']).default('created_at'),
   sort_order: z.enum(['asc', 'desc']).default('desc'),

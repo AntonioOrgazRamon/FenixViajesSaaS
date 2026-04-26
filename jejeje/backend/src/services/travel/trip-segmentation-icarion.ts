@@ -111,6 +111,8 @@ const NARROW_CATALOG_TITLES =
   /ENCANTOS?\s+DE|VIETNAM\s+SORPRENDENTE(?:\s+CON\s+SAPA)?|JAP[ÓO]N\s+DE|MARAVILLAS\s+DE|ICONOS\s+DE|NATURALEZA\s+DE|LUXURY\s+VIETNAM|VIETNAM\s+Y\s+CAMBOYA|VIETNAM\s+CON\s+SAPA|ENCANTOS\s+DE/i;
 
 const TITLE_SCAN = 40_000;
+const NARRATIVE_TITLE_VERB =
+  /\b(PASEAR|CONOCER|DESCUBR|MARAV[ÍI]LLATE|EMBARQUE|TENER|VISITAR|DISFRUTAR|EXPERIMENTAR|CONSULTA|VUELO|TRASLADO)\b/i;
 
 export function hasRealTripTitleNarrow(t: string): boolean {
   const h = t.slice(0, TITLE_SCAN);
@@ -303,6 +305,7 @@ export function isValidProductTitle(s: string | null | undefined): boolean {
   if (t.length < 4 || t.length > 80) return false;
   if (/20\d{2}\s*\/\s*20?\d{2,4}/.test(t) || /2025\/26|2026\/27/i.test(t)) return false;
   if (/^D[ÍI]A\s/i.test(t) || (t.length < 50 && /D[ÍI]A\s*1|D[ÍI]A\s*7/i.test(t))) return false;
+  if (NARRATIVE_TITLE_VERB.test(t)) return false;
   if (/CIUDAD DE ORIGEN/i.test(t)) return false;
   if (/^HOTELES EN|SERVICIOS INCLUIDOS|CONSULTA NUESTROS|CONSULTA\s+NUESTRO|PRECIO ORIENTATIVO|^SALIDAS\s*$/i.test(t)) {
     return false;
@@ -312,6 +315,66 @@ export function isValidProductTitle(s: string | null | undefined): boolean {
     if (!/MEXICANO|DOMINICANA|PUERTO|DE\s+LUJO|ENCANTOS/i.test(t)) return false;
   }
   return !isBlockedFirstLineOrTitle(t);
+}
+
+function looksNarrativeTitle(t: string): boolean {
+  if (NARRATIVE_TITLE_VERB.test(t)) return true;
+  if (/[.;:!?]/.test(t) && t.length > 18) return true;
+  const w = t.split(/\s+/).filter(Boolean);
+  if (w.length < 2 || w.length > 12) return true;
+  return false;
+}
+
+function extractIndexTitleHints(pages: { page: number; text: string }[]): string[] {
+  const hints: string[] = [];
+  for (const p of pages) {
+    if (p.page > 20) break;
+    if (!/\b[ÍI]NDICE\b/i.test(p.text) && !/CONSULTA\s+NUESTROS/i.test(p.text)) continue;
+    for (const l0 of p.text.split(/\n+/)) {
+      const l = l0.replace(/\s+/g, ' ').trim();
+      if (l.length < 6 || l.length > 90) continue;
+      if (isBlockedFirstLineOrTitle(l)) continue;
+      if (!/[A-Za-zÁÉÍÓÚÑáéíóúñ]/.test(l)) continue;
+      if (/\d{1,3}\s*$/.test(l)) continue; // n° página al final
+      const up = l.toUpperCase();
+      if (/(ENCANTOS|SORPRENDENTE|LUXURY|ICONOS|VIETNAM|CAMBOYA|LAOS|JAP[ÓO]N|DE LUJO)/i.test(up)) {
+        hints.push(up);
+      }
+    }
+  }
+  return Array.from(new Set(hints));
+}
+
+function computeSegmentScore(
+  text: string,
+  title: string | null,
+  indexHints: string[],
+): { score: number; titleScore: number; structureScore: number; itineraryScore: number; catalogIndexScore: number; reasons: string[] } {
+  const reasons: string[] = [];
+  const signals = countTripSignals(text);
+  const t = title?.trim() ?? '';
+  const titleScore = t && !looksNarrativeTitle(t) && !isBlockedFirstLineOrTitle(t) ? 0.3 : 0;
+  if (titleScore > 0) reasons.push('title-ok');
+  const structureRaw =
+    (signals.flags.includes('duration') ? 0.15 : 0) +
+    (signals.flags.includes('servicios') ? 0.1 : 0) +
+    (signals.flags.includes('salidas') ? 0.1 : 0) +
+    (signals.flags.includes('precio') ? 0.08 : 0) +
+    (signals.flags.includes('a_tener') ? 0.05 : 0);
+  const structureScore = Math.min(0.38, structureRaw);
+  if (structureScore > 0.2) reasons.push('structure-strong');
+  const itineraryScore = signals.flags.includes('itinerary') ? 0.22 : 0;
+  if (itineraryScore > 0) reasons.push('itinerary');
+  let catalogIndexScore = 0;
+  if (t && indexHints.some((h) => normalizeTitleLine(h) === normalizeTitleLine(t) || normalizeTitleLine(t).includes(normalizeTitleLine(h)))) {
+    catalogIndexScore = 0.12;
+    reasons.push('index-match');
+  }
+  if (t && looksNarrativeTitle(t)) {
+    reasons.push('title-narrative');
+  }
+  const score = Math.max(0, Math.min(1, titleScore + structureScore + itineraryScore + catalogIndexScore));
+  return { score, titleScore, structureScore, itineraryScore, catalogIndexScore, reasons };
 }
 
 export function isBlockedFirstLineOrTitle(candidate: string): boolean {
@@ -495,27 +558,37 @@ export function extractTripTitle(text: string): string | null {
   }
   return deLujoLineFallback(prepared);
 }
-export function shouldCreateTripForPage(text: string, pageNumber: number): { ok: boolean; title: string | null } {
+export function shouldCreateTripForPage(
+  text: string,
+  pageNumber: number,
+  opts?: { indexHints?: string[] },
+): { ok: boolean; title: string | null; score: number; reasons: string[] } {
   if (pageNumber < ICARION_COVER_MAX_PAGE + 1) {
-    return { ok: false, title: null };
+    return { ok: false, title: null, score: 0, reasons: ['cover'] };
   }
-  if (isLegalOrInfoOrIndexPage(text)) return { ok: false, title: null };
-  if (isHotelPageText(text)) return { ok: false, title: null };
-  if (!isRealTripPageText(text)) return { ok: false, title: null };
+  if (isLegalOrInfoOrIndexPage(text)) return { ok: false, title: null, score: 0, reasons: ['legal/info'] };
+  if (isHotelPageText(text)) return { ok: false, title: null, score: 0, reasons: ['hotel_page'] };
+  if (!isRealTripPageText(text)) return { ok: false, title: null, score: 0, reasons: ['not_real_trip_page'] };
   const prep = splitCatalogGlueArtifacts(cleanObviousNotTitleLines(text));
   const extracted = extractTitleLineCandidate(prep) ?? extractTripTitle(prep);
+  const idx = opts?.indexHints ?? [];
   if (extracted && !isBlockedFirstLineOrTitle(extracted)) {
-    return { ok: true, title: extracted.toUpperCase().replace(/\s+/g, ' ').trim() };
+    const norm = extracted.toUpperCase().replace(/\s+/g, ' ').trim();
+    const score = computeSegmentScore(text, norm, idx);
+    return { ok: score.score >= 0.7, title: score.score >= 0.7 ? norm : null, score: score.score, reasons: score.reasons };
   }
   if (hasRealTripTitlePattern(text) && /DE\s+LUJO|ENCANTOS|VIETNAM|JAP[ÓO]N/i.test(text)) {
     const m = text.match(
       /[A-ZÁÉÍÚÑ0-9][A-ZÁÉÍÚÑ0-9\s,'-]{3,50}\s+DE\s+LUJO|ENCANTOS DE [A-ZÁÉÍÑ\s]+/i,
     );
     if (m && !isBlockedFirstLineOrTitle(m[0]!)) {
-      return { ok: true, title: m[0]!.toUpperCase().replace(/\s+/g, ' ').trim() };
+      const norm = m[0]!.toUpperCase().replace(/\s+/g, ' ').trim();
+      const score = computeSegmentScore(text, norm, idx);
+      return { ok: score.score >= 0.7, title: score.score >= 0.7 ? norm : null, score: score.score, reasons: score.reasons };
     }
   }
-  return { ok: false, title: null };
+  const score = computeSegmentScore(text, extracted ?? null, idx);
+  return { ok: false, title: null, score: score.score, reasons: score.reasons };
 }
 
 export function classifyPageForLog(
@@ -628,6 +701,7 @@ export function buildIcarionSegments(
   const minP = opts.minPageForTrips ?? ICARION_COVER_MAX_PAGE + 1;
   const doLog = opts.log !== false;
   const sorted = [...pages].filter((p) => p.text?.trim().length).sort((a, b) => a.page - b.page);
+  const indexHints = extractIndexTitleHints(sorted);
   const out: {
     pageStart: number;
     pageEnd: number;
@@ -679,7 +753,8 @@ export function buildIcarionSegments(
       continue;
     }
 
-    const { ok, title: tripTitle } = shouldCreateTripForPage(t, n);
+    const pageEval = shouldCreateTripForPage(t, n, { indexHints });
+    const { ok, title: tripTitle } = pageEval;
     if (ok && tripTitle) {
       const action = current ? 'close_previous_and_open_new_trip' : 'open_new_trip';
       pushCurrent();
@@ -691,11 +766,21 @@ export function buildIcarionSegments(
       };
       log(n, {
         kind: 'TRIP_START',
-        motivo: buildTripLogMotivo(t, tripTitle),
+        motivo: `${buildTripLogMotivo(t, tripTitle)} | score=${pageEval.score.toFixed(2)}`,
         titulo: tripTitle,
         titleCandidate: tripTitle,
-        signals: formatSignalsForLog(t),
+        signals: `${formatSignalsForLog(t)} | ${pageEval.reasons.join(',')}`,
         action,
+      });
+      continue;
+    }
+    if (pageEval.score >= 0.5 && pageEval.score < 0.7) {
+      log(n, {
+        kind: 'ORPHAN_IGNORED',
+        motivo: `discardedCandidate: score=${pageEval.score.toFixed(2)} (<0.70)`,
+        titleCandidate: pageEval.title ?? extractTripTitle(t) ?? undefined,
+        signals: `${formatSignalsForLog(t)} | ${pageEval.reasons.join(',')}`,
+        action: 'discard_low_score',
       });
       continue;
     }

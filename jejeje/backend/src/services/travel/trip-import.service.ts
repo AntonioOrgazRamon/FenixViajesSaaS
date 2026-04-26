@@ -8,8 +8,15 @@ import { TripAIExtractionService } from './trip-ai-extraction.service';
 import { TripNormalizationService } from './trip-normalization.service';
 import { TripDeterministicExtractionService, mergeDeterministicWithAi } from './trip-deterministic-extraction.service';
 import type { TripAiExtract } from './trip-ai.schemas';
+import { config } from '../../common/config';
 import { NotFoundError } from '../../common/errors/AppError';
 import { logger } from '../../common/logger';
+import { cleanRepeatedCatalogHeaders } from './trip-text-cleaning.service';
+import { deepCleanTouristicText } from './trip-touristic-deep-clean.service';
+import { segmentTouristicDocument } from './trip-document-blocks.service';
+import { extractStructuredTripCatalog, mergeStructuredIntoTripExtract } from './trip-structured-catalog-extract.service';
+import { filterHotelsForPersistence, normKey, normalizeHotelName } from './trip-hotels-extract.service';
+import { countTripSignals, isBlockedFirstLineOrTitle } from './trip-segmentation-icarion';
 
 const pdfExtraction = new PdfExtractionService();
 const segmentation = new TripSegmentationService();
@@ -61,7 +68,24 @@ export class TripImportService {
     });
 
     try {
-      const extract = await pdfExtraction.extractTextFromDocument(documentId, companyId);
+      let simExtractProgress = 5;
+      const extractTick = setInterval(() => {
+        simExtractProgress = Math.min(simExtractProgress + 1, 22);
+        void prisma.travelImportJob
+          .update({
+            where: { id: jobId },
+            data: { progress: simExtractProgress, currentStep: 'extract' },
+          })
+          .catch(() => undefined);
+      }, 850);
+
+      let extract: Awaited<ReturnType<PdfExtractionService['extractTextFromDocument']>>;
+      try {
+        extract = await pdfExtraction.extractTextFromDocument(documentId, companyId);
+      } finally {
+        clearInterval(extractTick);
+      }
+
       const extractedPath = path.join(process.cwd(), extract.extractedTextPath);
       const raw = await readFile(extractedPath, 'utf-8');
       const data = JSON.parse(raw) as ExtractedFile;
@@ -70,7 +94,7 @@ export class TripImportService {
       }
       await prisma.travelImportJob.update({
         where: { id: jobId },
-        data: { progress: 25, currentStep: 'segment' },
+        data: { progress: 24, currentStep: 'segment' },
       });
 
       await prisma.travelTrip.deleteMany({
@@ -79,40 +103,113 @@ export class TripImportService {
 
       const segs = segmentation.segmentFromPages(data.pages).filter((s) => s.kind === 'trip');
       const total = Math.max(1, segs.length);
-      let done = 0;
-      for (const seg of segs) {
+      await prisma.travelImportJob.update({
+        where: { id: jobId },
+        data: { progress: 25, currentStep: `trips:${total}` },
+      });
+
+      for (let i = 0; i < segs.length; i++) {
+        const seg = segs[i]!;
+        const { base, end } = tripSegmentProgressRange(i, total);
+        const span = Math.max(1, end - base);
+        await prisma.travelImportJob.update({
+          where: { id: jobId },
+          data: { progress: base, currentStep: `prep:${i + 1}/${total}` },
+        });
         try {
-          const det = deterministic.extractFromBlock(seg.rawTextForAI, seg.title);
+          const cleaned = deepCleanTouristicText(seg.rawTextForAI);
+          const segmentValidation = validateTripSegment(seg.title, cleaned);
+          if (!segmentValidation.ok) {
+            logger.info(
+              {
+                title: seg.title,
+                pageStart: seg.pageStart,
+                pageEnd: seg.pageEnd,
+                reasons: segmentValidation.reasons,
+                score: segmentValidation.score,
+              },
+              'import: segmento descartado por validador (no ficha sólida)',
+            );
+            continue;
+          }
+          const blocks = segmentTouristicDocument(cleaned);
+          const structured = extractStructuredTripCatalog(blocks, seg.title, cleaned);
+          const det = deterministic.extractFromBlock(cleaned, seg.title);
+          await prisma.travelImportJob.update({
+            where: { id: jobId },
+            data: {
+              progress: base + Math.max(1, Math.floor(span * 0.36)),
+              currentStep: `ai:${i + 1}/${total}`,
+            },
+          });
           const { data: ai, usedModel } = await aiExtraction.extractFromBlock({
             titleHint: seg.title,
             pageStart: seg.pageStart,
             pageEnd: seg.pageEnd,
-            text: seg.rawTextForAI,
+            text: cleaned,
+          });
+          await prisma.travelImportJob.update({
+            where: { id: jobId },
+            data: {
+              progress: base + Math.max(1, Math.floor(span * 0.7)),
+              currentStep: `persist:${i + 1}/${total}`,
+            },
           });
           const merged = mergeDeterministicWithAi(det, ai, seg.title);
-          const deduped = normalizer.dedupeDestinations(merged.destinations);
-          const aiNorm = normalizer.normalizeTripStrings({ ...merged, destinations: deduped });
-          const confidence =
-            usedModel && aiNorm.confidence != null ? aiNorm.confidence : usedModel ? 0.5 : 0.25;
+          const withStructured = mergeStructuredIntoTripExtract(structured, merged);
+          if (config.TRAVEL_HOTEL_PIPELINE_LOG) {
+            logger.info(
+              {
+                segmentTitle: seg.title,
+                pageStart: seg.pageStart,
+                pageEnd: seg.pageEnd,
+                hotelsCount: withStructured.hotels.length,
+                structuredHotels: structured.hotels.length,
+                mergedHotelsBeforeStruct: merged.hotels.length,
+              },
+              'travel:merge estructurado+IA (hoteles finales en withStructured)',
+            );
+          }
+          const deduped = normalizer.dedupeDestinations(withStructured.destinations);
+          const cleanedItinerary = validateItineraryDays(withStructured.itineraryDays, withStructured.title ?? seg.title);
+          const aiNorm = normalizer.normalizeTripStrings({
+            ...withStructured,
+            itineraryDays: cleanedItinerary,
+            destinations: deduped,
+          });
+          const confidence = Math.max(
+            structured.confidenceScore,
+            usedModel && (aiNorm.confidence ?? 0) > 0.2
+              ? (aiNorm.confidence as number)
+              : usedModel
+                ? 0.45
+                : 0.25,
+          );
+          const structuredHotelWhitelistNormKeys = new Set<string>();
+          for (const sh of structured.hotels) {
+            const hn = sh.hotelName?.trim();
+            if (hn) {
+              structuredHotelWhitelistNormKeys.add(normKey(normalizeHotelName(hn)));
+            }
+          }
           const trip = await this.persistTrip(companyId, documentId, {
             sourcePageStart: seg.pageStart,
             sourcePageEnd: seg.pageEnd,
-            rawText: seg.rawTextForAI,
+            rawText: cleaned,
             data: { ...aiNorm, confidence: aiNorm.confidence ?? confidence },
             confidence,
+            structuredHotelWhitelistNormKeys,
           });
           logger.info({ tripId: trip.id, documentId, title: seg.title }, 'viaje importado (pending_review)');
-          done += 1;
         } catch (e) {
           logger.error(
             { err: e, documentId, segment: seg.title, pageStart: seg.pageStart, pageEnd: seg.pageEnd },
             'import: fallo en segmento (resto de viajes continúa)',
           );
         }
-        const progress = 25 + Math.floor((70 * done) / total);
         await prisma.travelImportJob.update({
           where: { id: jobId },
-          data: { progress, currentStep: `save:${done}/${total}` },
+          data: { progress: end, currentStep: `save:${i + 1}/${total}` },
         });
       }
 
@@ -147,9 +244,26 @@ export class TripImportService {
       rawText: string;
       data: TripAiExtract & { confidence?: number | null };
       confidence: number;
+      /** Hoteles ya validados en capa tabla/títulos del mismo segmento (normKey). */
+      structuredHotelWhitelistNormKeys?: Set<string>;
     },
   ) {
     const { data } = input;
+    const { kept: hotelRows, dropped: droppedHotels } = filterHotelsForPersistence(data.hotels, {
+      visualWhitelistNormKeys: input.structuredHotelWhitelistNormKeys,
+    });
+    if ((config.NODE_ENV === 'development' || config.TRAVEL_HOTEL_PIPELINE_LOG) && droppedHotels.length > 0) {
+      logger.info(
+        { nDropped: droppedHotels.length, sample: droppedHotels.slice(0, 16) },
+        'travel:persist — hoteles descartados (validador final)',
+      );
+    }
+    const persistConfidence =
+      hotelRows.length === 0
+        ? Math.min(input.confidence, 0.36)
+        : data.hotels.length > 0 && hotelRows.length < data.hotels.length
+          ? Math.min(input.confidence, 0.48)
+          : input.confidence;
     const price = normalizer.buildPrice(data);
     return prisma.$transaction(async (tx) => {
       const trip = await tx.travelTrip.create({
@@ -166,10 +280,10 @@ export class TripImportService {
           indicativePrice: price,
           currency: data.currency,
           status: 'PENDING_REVIEW',
-          confidenceScore: input.confidence,
+          confidenceScore: persistConfidence,
           sourcePageStart: input.sourcePageStart,
           sourcePageEnd: input.sourcePageEnd,
-          rawExtractedText: input.rawText.slice(0, 1_000_000),
+          rawExtractedText: cleanRepeatedCatalogHeaders(input.rawText).slice(0, 1_000_000),
         },
       });
 
@@ -236,14 +350,15 @@ export class TripImportService {
         });
       }
 
-      for (const h of data.hotels) {
+      let hIndex = 0;
+      for (const h of hotelRows) {
         await tx.tripHotel.create({
           data: {
             tripId: trip.id,
             category: h.category ? h.category.slice(0, 50) : null,
             city: h.city ? h.city.slice(0, 150) : null,
             hotelName: h.hotelName ? h.hotelName.slice(0, 255) : null,
-            orderIndex: h.order ?? 0,
+            orderIndex: hIndex++,
           },
         });
       }
@@ -270,4 +385,73 @@ function parseSqlDate(s: string | null | undefined): Date | null {
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return null;
   return d;
+}
+
+/** Rango de % del job (25–95) asignado al viaje `i` de `total` (0-based). */
+function tripSegmentProgressRange(i: number, total: number): { base: number; end: number } {
+  const t = Math.max(1, total);
+  const base = 25 + Math.floor((70 * i) / t);
+  const end = 25 + Math.floor((70 * (i + 1)) / t);
+  return { base, end: Math.max(base + 1, end) };
+}
+
+function validateTripSegment(title: string, text: string): { ok: boolean; score: number; reasons: string[] } {
+  const reasons: string[] = [];
+  const t = title.replace(/\s+/g, ' ').trim();
+  const signals = countTripSignals(text);
+  let titleScore = 0;
+  if (t.length >= 4 && t.length <= 90 && !isBlockedFirstLineOrTitle(t) && !/\b(PASEAR|CONOCER|DESCUBRIR|EMBARQUE|VISITAR|DISFRUTAR|VUELO|TRASLADO)\b/i.test(t)) {
+    titleScore = 0.34;
+    reasons.push('title-ok');
+  } else {
+    reasons.push('title-weak');
+  }
+  const structureScore = Math.min(
+    0.46,
+    (signals.flags.includes('duration') ? 0.14 : 0) +
+      (signals.flags.includes('servicios') ? 0.1 : 0) +
+      (signals.flags.includes('salidas') ? 0.1 : 0) +
+      (signals.flags.includes('precio') ? 0.06 : 0) +
+      (signals.flags.includes('a_tener') ? 0.06 : 0),
+  );
+  const itineraryScore = signals.flags.includes('itinerary') ? 0.2 : 0;
+  const score = Math.max(0, Math.min(1, titleScore + structureScore + itineraryScore));
+  if (structureScore < 0.2) reasons.push('structure-weak');
+  if (!signals.flags.includes('itinerary')) reasons.push('no-itinerary');
+  return { ok: score >= 0.7, score, reasons };
+}
+
+function validateItineraryDays(
+  days: TripAiExtract['itineraryDays'],
+  tripTitle: string | null | undefined,
+): TripAiExtract['itineraryDays'] {
+  const t = (tripTitle ?? '').replace(/\s+/g, ' ').trim();
+  const out: TripAiExtract['itineraryDays'] = [];
+  for (const d of days) {
+    const src = (d.description ?? '').replace(/\s+/g, ' ').trim();
+    if (!src) {
+      out.push(d);
+      continue;
+    }
+    let cut = src;
+    const blockers = [
+      /\bSERVICIOS\s+INCLUIDOS\b/i,
+      /\bHOTELES(?:\s*\(|\s+EN)?\b/i,
+      /\bPRECIO\s+ORIENTATIVO\b/i,
+      /\bSALIDAS\b/i,
+      /\bEXPERIENCIAS\s+(?:DESTACADAS|OPCIONALES)\b/i,
+    ];
+    for (const re of blockers) {
+      const i = cut.search(re);
+      if (i >= 0) cut = cut.slice(0, i).trim();
+    }
+    if (t) {
+      const i = cut.toUpperCase().indexOf(t.toUpperCase());
+      if (i >= 0) {
+        cut = cut.slice(0, i).trim();
+      }
+    }
+    out.push({ ...d, description: cut || null });
+  }
+  return out;
 }

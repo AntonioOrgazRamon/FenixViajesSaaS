@@ -23,8 +23,9 @@ import { apiDocs } from './api-docs';
 
 const app = express();
 
-// Middlewares
-app.use(helmet());
+// Middlewares: CORP same-origin (helmet default) evita mostrar /uploads en <img> si la
+// SPA (p. ej. 127.0.0.1:5173) y el API (:3000) se consideran distinto origen.
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors());
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 app.use(express.json());

@@ -31,7 +31,10 @@ export class UserController {
   }
 
   async getUserById(req: Request, res: Response) {
-    const user = await userService.getUserById(req.params.id as string);
+    const viewer = req.user
+      ? { role: req.user.role, companyId: req.user.companyId ?? null }
+      : undefined;
+    const user = await userService.getUserById(req.params.id as string, viewer);
 
     if (req.user?.role === 'COMPANY_ADMIN' || req.user?.role === 'COMPANY_USER') {
       if (user.companyId == null || user.companyId !== req.user.companyId) {

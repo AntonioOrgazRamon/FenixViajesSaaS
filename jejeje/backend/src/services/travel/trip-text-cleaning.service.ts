@@ -6,13 +6,17 @@ const PAGE_MARKER_LINE = /^---\s*Pág\.\s*real\s+\d+[^-\n]*---\s*$/gim;
 const EMBEDDED_TRIP_DEBUG = /---\s*Pág\.\s*real\s+\d+\s*\([^)]+\)\s*---/gi;
 /** Cabecera corta "CARIBE DE LUJO 2025/26" (no título "CARIBE MEXICANO DE LUJO") */
 const SHORT_DE_LUJO_SEASON = /\b(CARIBE|JAP[ÓO]N|IC[ÁA]RION)\s+DE\s+LUJO\s+20\d{2}\s*\/\s*20?\d{2,4}/gi;
-/** Misma cabecera pegada dos o más veces seguidas (OCR) */
+/** "CARIBE DE LUJO 2025/26" sin espacio de separación, repetida (pegada) */
+const GLUED_CARIBE_SAME = /(?:CARIBE\s+DE\s+LUJO\s*20?\d{2}?\s*\/?\s*20?\d{2,4}){2,}/gi;
+/** Misma cabecera pegada dos o más veces seguidas (OCR) con variantes (CARIBE, JAPÓN…) */
 const GLUED_SEASON = /(?:\b(CARIBE|JAP[ÓO]N)\s+DE\s+LUJO\s+20\d{2}\s*\/\s*20?\d{2,4}){2,}/gi;
 /** Inicio de línea: cabecera + basura */
 const LINE_LEAD_CARIBE_SEASON = /^(?:\s*CARIBE\s+DE\s+LUJO\s+20\d{2}\s*\/\s*20?\d{2,4}[\s]*){1,4}/gim;
 const STANDALONE_SEASON = /^(?:\s*)(?:[A-ZÁÉÍÑ0-9\-\s]{0,30}\s+)?20\d{2}\s*\/\s*20?\d{2,4}\s*$/gim;
 const CATALOG_SLOGAN = /\b(VIETNAM|JAP[ÓO]N|IC[ÁA]RION)\s+20\d{2}\s*\/\s*20?\d{2,4}/gi;
 const MANY_DASH = /\n?-{3,}\n?/g;
+/** Cualquier repetición 2+ de la frase corta (con o sin espacios) */
+const BANNER_REPEAT_STRIP = /(?:\bCARIBE\s+DE\s+LUJO\s*20?\d{2}?\s*\/?\s*20?\d{2,4}\s*){2,}/gi;
 
 /**
  * Elimina cabeceras de temporada o marca repetida típicas de catálogos Icárion/similares.
@@ -21,14 +25,20 @@ const MANY_DASH = /\n?-{3,}\n?/g;
  */
 export function cleanRepeatedCatalogHeaders(text: string): string {
   let t = text;
+  t = t.replace(BANNER_REPEAT_STRIP, ' ');
+  t = t.replace(GLUED_CARIBE_SAME, ' ');
   t = t.replace(GLUED_SEASON, ' ');
   t = t.replace(SHORT_DE_LUJO_SEASON, ' ');
   t = t.replace(CATALOG_SLOGAN, ' ');
   t = t.replace(LINE_LEAD_CARIBE_SEASON, ' ');
   t = t.replace(STANDALONE_SEASON, '\n');
   t = t.replace(
-    /CARIBE\s+DE\s+LUJO\s*20?\d{2}?\s*\/?\s*20?\d{2,4}?\s*CARIBE\s+DE\s+LUJO/gi,
+    /(?:CARIBE\s+DE\s+LUJO\s*20?\d{2}?\s*\/?\s*20?\d{2,4}?\s*)+CARIBE\s+DE\s+LUJO/gi,
     ' ',
+  );
+  t = t.replace(
+    /(CARIBE\s+DE\s+LUJO\s+20\d{2}\s*\/\s*20?\d{2,4})(?=[A-ZÁÉÑ0-9])/gi,
+    '$1 ',
   );
   const lines = t.split(/\n/).filter((l, i, a) => i === 0 || l.trim() !== a[i - 1]!.trim());
   t = lines.join('\n');
@@ -37,7 +47,7 @@ export function cleanRepeatedCatalogHeaders(text: string): string {
   return t
     .replace(/[ \t]+/g, ' ')
     .replace(/^\s+|\s+$/gm, '')
-    .replace(/\n{2,}CARIBE DE LUJO 20\d{2}[^\n]*/gim, '\n')
+    .replace(/\n{2,}\s*CARIBE\s+DE\s+LUJO\s+20\d{2}[^\n]*/gim, '\n')
     .trim();
 }
 

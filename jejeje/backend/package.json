@@ -4,6 +4,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "test:hotels": "npx ts-node --transpile-only scripts/validate-hotel-extract.ts && npx ts-node --transpile-only scripts/hotel-guard-cases.ts && npx ts-node --transpile-only scripts/hotel-scenarios-validate.ts && npx ts-node --transpile-only scripts/validate-vietnam-pipeline.ts",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts"
   },
   "keywords": [],

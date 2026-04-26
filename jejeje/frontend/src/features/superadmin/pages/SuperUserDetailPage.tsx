@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../lib/axios';
 import { unwrap } from '../../../lib/api';
 import type { UserDetail } from '../../../types/domain';
+import { appPageTitle } from '../../../lib/appTable';
+import { UserDetailPanel } from '../../users/components/UserDetailPanel';
 
 export function SuperUserDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -21,39 +23,25 @@ export function SuperUserDetailPage() {
 
   return (
     <div>
-      <Link to="/superadmin/users" className="text-sm text-amber-400 hover:underline">
+      <Link
+        to="/superadmin/users"
+        className="text-sm font-medium text-amber-700 hover:underline dark:text-amber-400"
+      >
         ← Usuarios
       </Link>
-      <h1 className="mt-4 text-2xl font-semibold text-white">{data.email}</h1>
-      <p className="text-sm text-zinc-500">
-        {data.firstName} {data.lastName}
-      </p>
-      <dl className="mt-6 grid w-full gap-2 text-sm">
-        <div className="flex justify-between border-b border-white/5 py-2">
-          <dt className="text-zinc-500">Rol</dt>
-          <dd className="text-zinc-200">{data.role}</dd>
-        </div>
-        <div className="flex justify-between border-b border-white/5 py-2">
-          <dt className="text-zinc-500">Estado</dt>
-          <dd className="text-zinc-200">{data.status}</dd>
-        </div>
-        <div className="flex justify-between border-b border-white/5 py-2">
-          <dt className="text-zinc-500">Empresa ID</dt>
-          <dd className="truncate text-zinc-400">{data.companyId || '—'}</dd>
-        </div>
-      </dl>
-      <div className="mt-6 flex flex-wrap gap-3">
+      <h1 className={`${appPageTitle} mt-3`}>Ficha de usuario</h1>
+      <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-500">Vista ampliada con datos de cuenta, actividad y organización.</p>
+
+      <div className="mt-4 w-full">
+        <UserDetailPanel data={data} showCompanyAdminLink sessionsHref={`/superadmin/users/${id}/sessions`} />
+      </div>
+
+      <div className="mt-4 flex w-full flex-wrap gap-3">
         <Link
           to={`/superadmin/users/${id}/edit`}
-          className="rounded-lg border border-white/15 px-4 py-2 text-sm text-zinc-200 hover:bg-white/5"
+          className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50 dark:border-white/15 dark:text-zinc-200 dark:hover:bg-white/5"
         >
           Editar
-        </Link>
-        <Link
-          to={`/superadmin/users/${id}/sessions`}
-          className="rounded-lg border border-amber-500/30 px-4 py-2 text-sm text-amber-200 hover:bg-amber-500/10"
-        >
-          Sesiones
         </Link>
       </div>
     </div>

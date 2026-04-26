@@ -21,13 +21,11 @@ function legacyInitials(u: UserAvatarUserFields): string {
 }
 
 function imageSrc(u: UserAvatarUserFields): string | null {
-  const raw =
-    u.avatar?.type === 'uploaded' && u.avatar.url
-      ? u.avatar.url
-      : !u.avatar && u.avatar_url
-        ? u.avatar_url
-        : null;
-  return resolveMediaUrl(raw);
+  const nested = (u.avatar?.url ?? '').trim();
+  const legacy = (u.avatar_url ?? '').trim();
+  if (!nested && !legacy) return null;
+  // Preferir objeto anidado, luego legado (si hubo sesión a medio mezclar, sigue el fallback).
+  return resolveMediaUrl(nested || legacy);
 }
 
 const shapeClass = (s: 'circle' | 'rounded' | 'square' | undefined) => {

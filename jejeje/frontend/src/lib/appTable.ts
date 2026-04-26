@@ -36,3 +36,33 @@ export const appSelect = cn(
   'border-zinc-300 bg-white text-zinc-900',
   'dark:border-white/10 dark:bg-black/40 dark:text-white',
 );
+
+/** Etiqueta de barra de filtros (baja altura) */
+export const appFilterLabel = cn(
+  'mb-0.5 block text-[10px] font-semibold uppercase tracking-wider',
+  'text-zinc-500 dark:text-zinc-400',
+);
+
+/** Input compacto (h-8) para filas de filtros */
+export const appInputFilter = cn(
+  'h-8 w-full min-w-0 rounded-md border px-2.5 text-xs leading-none',
+  'border-zinc-300 bg-white text-zinc-900 placeholder:text-zinc-400',
+  'dark:border-white/10 dark:bg-black/30 dark:text-zinc-100',
+  'focus:border-amber-500/40 focus:outline-none focus:ring-1 focus:ring-amber-500/20',
+);
+
+/** Select compacto alineado con `appInputFilter` */
+export const appSelectFilter = cn(
+  'h-8 w-full min-w-0 cursor-pointer rounded-md border px-2 pr-7 text-xs',
+  'border-zinc-300 bg-white text-zinc-900',
+  'dark:border-white/10 dark:bg-black/40 dark:text-white',
+  'focus:border-amber-500/40 focus:outline-none focus:ring-1 focus:ring-amber-500/20',
+);
+
+/** Contenedor opcional: agrupa filtros y reduce aire */
+export const appFilterBar = cn(
+  'rounded-lg border p-2.5',
+  'border-zinc-200/90 bg-zinc-50/50',
+  'dark:border-white/[0.08] dark:bg-zinc-900/30',
+  'sm:p-3',
+);

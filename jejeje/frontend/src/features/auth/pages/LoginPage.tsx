@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import gsap from 'gsap';
-import { ArrowRight, Lock, Mail, Sparkles, Workflow, Zap } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, Lock, Mail, Sparkles, Workflow, Zap } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuthStore, type AuthUser } from '../../../store/authStore';
 import { writeStoredThemePreference } from '../../../lib/theme';
@@ -72,6 +72,7 @@ export const LoginPage = () => {
   const setAuth = useAuthStore((s) => s.setAuth);
   const [error, setError] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const rootRef = useRef<HTMLDivElement>(null);
   const leftRef = useRef<HTMLDivElement>(null);
@@ -407,12 +408,21 @@ export const LoginPage = () => {
                     />
                     <input
                       id="password"
-                      type="password"
+                      type={showPassword ? 'text' : 'password'}
                       autoComplete="current-password"
                       {...register('password')}
-                      className="w-full rounded-xl border border-white/[0.08] bg-black/40 py-3.5 pl-12 pr-4 text-sm text-white outline-none transition-[border-color,box-shadow,background-color] duration-200 placeholder:text-zinc-600 focus:border-amber-500/35 focus:bg-black/55 focus:shadow-[0_0_0_3px_rgba(251,191,36,0.12)]"
+                      className="w-full rounded-xl border border-white/[0.08] bg-black/40 py-3.5 pl-12 pr-12 text-sm text-white outline-none transition-[border-color,box-shadow,background-color] duration-200 placeholder:text-zinc-600 focus:border-amber-500/35 focus:bg-black/55 focus:shadow-[0_0_0_3px_rgba(251,191,36,0.12)]"
                       placeholder="Tu contraseña"
                     />
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      onClick={() => setShowPassword((s) => !s)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-zinc-500 transition-colors hover:text-amber-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-400/50"
+                      aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                    >
+                      {showPassword ? <EyeOff className="h-[18px] w-[18px]" aria-hidden /> : <Eye className="h-[18px] w-[18px]" aria-hidden />}
+                    </button>
                   </div>
                   {errors.password && <p className="text-sm text-red-400/90">{errors.password.message}</p>}
                 </div>

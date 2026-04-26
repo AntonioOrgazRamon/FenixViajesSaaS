@@ -18,8 +18,13 @@ import {
   shouldBlockPasswordResetEmail,
 } from './passwordResetRateLimit';
 import { AuthProvider, CompanyStatus, UserStatus } from '@prisma/client';
+import type { z } from 'zod';
+import { updateProfileExtendedSchema } from '../profile/profile.schema';
+import { companyListSelect, userCoreNoPreferenceColumns } from '../../common/prisma/userSelects';
 
 const profileService = new ProfileService();
+
+type UpdateProfileBody = z.infer<typeof updateProfileExtendedSchema>;
 
 const GENERIC_FORGOT_RESPONSE = {
   message: 'Si el correo existe en nuestro sistema, recibirás un enlace para restablecer tu contraseña.',
@@ -57,7 +62,13 @@ function genericResetLinkError() {
 
 export class AuthService {
   async login(email: string, password: string, ipAddress?: string, userAgent?: string, deviceName?: string) {
-    const user = await prisma.user.findUnique({ where: { email }, include: { company: true } });
+    const user = await prisma.user.findUnique({
+      where: { email: normalizeEmail(email) },
+      select: {
+        ...userCoreNoPreferenceColumns,
+        company: { select: companyListSelect },
+      },
+    });
 
     if (!user) throw new UnauthorizedError('Credenciales inválidas');
     if (user.status === 'SUSPENDED') throw new ForbiddenError('USER_SUSPENDED');
@@ -187,7 +198,14 @@ export class AuthService {
 
     const session = await prisma.session.findUnique({
       where: { id: sessionId },
-      include: { user: { include: { company: true } } }
+      include: {
+        user: {
+          select: {
+            ...userCoreNoPreferenceColumns,
+            company: { select: companyListSelect },
+          },
+        },
+      },
     });
 
     if (!session || session.revokedAt || session.expiresAt < new Date()) {
@@ -241,26 +259,15 @@ export class AuthService {
     return profileService.getProfile(userId);
   }
 
-  async updateProfile(userId: string, data: {
-    firstName?: string;
-    lastName?: string;
-    phone?: string;
-    locale?: 'es' | 'en';
-    timezone?: string;
-    theme?: 'LIGHT' | 'DARK' | 'SYSTEM';
-  }) {
-    return profileService.updateProfile(userId, {
-      firstName: data.firstName,
-      lastName: data.lastName,
-      phone: data.phone,
-      language: data.locale,
-      timezone: data.timezone,
-      theme: data.theme,
-    });
+  async updateProfile(userId: string, data: UpdateProfileBody) {
+    return profileService.updateProfile(userId, data);
   }
 
   async changePassword(userId: string, currentPassword: string, newPassword: string) {
-    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, passwordHash: true, companyId: true, role: true, email: true },
+    });
     if (!user) throw new UnauthorizedError();
 
     const isValid = await bcrypt.compare(currentPassword, user.passwordHash);
@@ -313,7 +320,10 @@ export class AuthService {
 
     const user = await prisma.user.findUnique({
       where: { email: key },
-      include: { company: true },
+      select: {
+        ...userCoreNoPreferenceColumns,
+        company: { select: { status: true } },
+      },
     });
 
     if (!user) {
@@ -415,7 +425,14 @@ export class AuthService {
     const tokenHash = hashPasswordResetToken(plain);
     return prisma.passwordResetToken.findUnique({
       where: { tokenHash },
-      include: { user: { include: { company: true } } },
+      include: {
+        user: {
+          select: {
+            ...userCoreNoPreferenceColumns,
+            company: { select: { status: true } },
+          },
+        },
+      },
     });
   }
 

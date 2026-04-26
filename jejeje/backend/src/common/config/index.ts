@@ -35,12 +35,20 @@ const envSchema = z.object({
   JWT_SECRET: z.string().default('super-secret-key-change-me'),
   JWT_REFRESH_SECRET: z.string().default('super-refresh-secret-key-change-me'),
   /** Tamaño máximo de PDF de catálogo (MB) */
-  TRAVEL_PDF_MAX_MB: z.string().default('80'),
+  TRAVEL_PDF_MAX_MB: z.string().default('150'),
   /** Directorio bajo process.cwd() para guardar PDFs y JSON extraídos */
   TRAVEL_PDF_BASE_DIR: z.string().default('uploads/travel-pdfs'),
   /** Modelo OpenAI para extracción estructurada (FASE 5) */
   TRAVEL_OPENAI_MODEL: z.string().default('gpt-4o-mini'),
   OPENAI_API_KEY: z.string().optional(),
+  /**
+   * Logs de depuración del pipeline de hoteles (importación por segmento).
+   * `true` / `1` activa; en producción dejar en false.
+   */
+  TRAVEL_HOTEL_PIPELINE_LOG: z
+    .string()
+    .optional()
+    .transform((s) => s === '1' || s === 'true' || s === 'yes'),
 });
 
 const envVars = envSchema.safeParse(process.env);

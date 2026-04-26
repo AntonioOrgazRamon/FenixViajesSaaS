@@ -167,8 +167,14 @@ model User {
   firstName           String        @map("first_name")
   lastName            String        @map("last_name")
   phone               String?
+  /// Nombre visible (UI); opcional. Si null, se puede derivar de nombre + apellidos.
+  displayName         String?       @map("display_name") @db.VarChar(150)
   locale              String?
   timezone            String?
+  /// Preferencia de reloj: "24h" | "12h"
+  timeFormat          String?       @map("time_format") @db.VarChar(8)
+  /// Estilo de fecha: "dmy" | "mdy" | "ymd" | "locale"
+  dateFormat          String?       @map("date_format") @db.VarChar(16)
   avatarUrl           String?          @map("avatar_url") @db.VarChar(500)
   avatarType          UserAvatarType   @default(DEFAULT) @map("avatar_type")
   avatarBackgroundColor String?        @map("avatar_background_color") @db.VarChar(7)
@@ -176,6 +182,8 @@ model User {
   avatarInitials        String?        @map("avatar_initials") @db.VarChar(3)
   avatarShape           UserAvatarShape @default(CIRCLE) @map("avatar_shape")
   theme               Theme         @default(SYSTEM)
+  /// Preferencias de cuenta (notificaciones, etc.) en JSON; null = defaults en servidor.
+  profilePreferences  Json?        @map("profile_preferences")
   googleId            String?       @unique @map("google_id") @db.VarChar(255)
   authProvider        AuthProvider  @default(LOCAL) @map("auth_provider")
   failedLoginAttempts Int           @default(0) @map("failed_login_attempts")

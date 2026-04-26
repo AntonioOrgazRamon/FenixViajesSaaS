@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { isAxiosError } from 'axios';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, FileText, Loader2, Play, RefreshCw, Trash2, X } from 'lucide-react';
 import { api } from '../../../lib/axios';
@@ -6,9 +7,10 @@ import { unwrap } from '../../../lib/api';
 import { useAuthStore } from '../../../store/authStore';
 import type { Company, Paginated } from '../../../types/domain';
 import {
+  appFilterLabel,
   appInputBorder,
   appPageTitle,
-  appSelect,
+  appSelectFilter,
   appTableBody,
   appTableCellMuted,
   appTableCellSoft,
@@ -61,11 +63,27 @@ function superParams(companyId: string | undefined) {
 
 function stepLabel(s: string | null | undefined): string {
   if (!s) return '';
-  if (s === 'extract') return 'Extrayendo texto';
-  if (s === 'segment') return 'Detectando viajes';
+  if (s === 'extract') return 'Extrayendo texto del PDF…';
+  if (s === 'segment') return 'Detectando viajes en el catálogo…';
+  if (s.startsWith('trips:')) {
+    const n = s.slice(6);
+    return `${n} viaje${n === '1' ? '' : 's'} detectado${n === '1' ? '' : 's'}`;
+  }
+  if (s.startsWith('prep:')) {
+    const rest = s.slice(5).replace('/', ' de ');
+    return `Preparando ${rest}`;
+  }
+  if (s.startsWith('ai:')) {
+    const rest = s.slice(3).replace('/', ' de ');
+    return `IA: analizando ${rest}`;
+  }
+  if (s.startsWith('persist:')) {
+    const rest = s.slice(8).replace('/', ' de ');
+    return `Guardando ${rest}`;
+  }
   if (s.startsWith('save:')) {
     const rest = s.slice(5);
-    return `Importando ${rest.replace('/', ' de ')}`;
+    return `Viaje ${rest.replace('/', ' de ')}`;
   }
   if (s === 'done' || s === 'queued') return s === 'done' ? 'Completado' : 'En cola';
   return s;
@@ -138,7 +156,7 @@ export function TravelCatalogPage() {
     enabled: canQuery,
     refetchInterval: (query) => {
       const d = query.state.data as DocListPayload | undefined;
-      return d?.items?.some((x) => x.status === 'PROCESSING') ? 2_500 : false;
+      return d?.items?.some((x) => x.status === 'PROCESSING') ? 900 : false;
     },
   });
 
@@ -153,7 +171,7 @@ export function TravelCatalogPage() {
     enabled: canQuery,
     refetchInterval: () => {
       const d = qc.getQueryData<DocListPayload>(['travel-documents', isSuper, companyId, docPage]);
-      return d?.items?.some((x) => x.status === 'PROCESSING') ? 4_000 : false;
+      return d?.items?.some((x) => x.status === 'PROCESSING') ? 1_200 : false;
     },
   });
 
@@ -176,7 +194,16 @@ export function TravelCatalogPage() {
       await api.post('/travel/documents/upload', form, { params: sp() });
       await qc.invalidateQueries({ queryKey: ['travel-documents'] });
       setDocPage(1);
-    } catch {
+    } catch (e) {
+      if (isAxiosError(e)) {
+        const msg =
+          (e.response?.data as { error?: { message?: string } } | undefined)?.error?.message ??
+          (typeof e.response?.data === 'string' ? e.response.data : null);
+        if (msg && msg.trim().length > 0) {
+          setErr(msg.trim());
+          return;
+        }
+      }
       setErr('No se pudo subir el PDF. Revisa el tamaño y vuelve a intentarlo.');
     } finally {
       setFileBusy(false);
@@ -332,10 +359,13 @@ export function TravelCatalogPage() {
           </p>
         </div>
         {isSuper && (
-          <div className="min-w-[220px]">
-            <label className="text-xs font-medium text-zinc-600 dark:text-zinc-500">Empresa</label>
+          <div className="min-w-0 w-full sm:w-52 sm:max-w-[14rem] sm:shrink-0">
+            <label className={appFilterLabel} htmlFor="tc-company">
+              Empresa
+            </label>
             <select
-              className={appSelect}
+              id="tc-company"
+              className={appSelectFilter}
               value={companyId}
               onChange={(e) => {
                 setCompanyId(e.target.value);
@@ -424,9 +454,9 @@ export function TravelCatalogPage() {
                           title={d.importJob?.currentStep ? stepLabel(d.importJob.currentStep) : 'Procesando…'}
                         >
                           <div
-                            className="h-full min-w-0 rounded-full bg-gradient-to-r from-amber-500 to-amber-400 transition-[width] duration-500 dark:from-amber-600 dark:to-amber-500"
+                            className="h-full min-w-0 rounded-full bg-gradient-to-r from-amber-500 to-amber-400 transition-[width] duration-300 ease-out dark:from-amber-600 dark:to-amber-500"
                             style={{
-                              width: `${Math.min(100, Math.max(2, d.importJob?.progress ?? 2))}%`,
+                              width: `${Math.min(100, Math.max(1, d.importJob?.progress ?? 1))}%`,
                             }}
                           />
                         </div>
