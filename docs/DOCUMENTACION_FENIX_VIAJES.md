@@ -67,7 +67,7 @@ Resumen de decisiones y tareas relevantes en el entorno de desarrollo:
 | `main` | Monorepo completo. |
 | `frontend` | Historial y archivos equivalentes a **`jejeje/frontend`**, con la raíz del repositorio = raíz del front (útil para despliegues solo-front o CI aislada). |
 | `backend` | Igual para **`jejeje/backend`**. |
-| `otros` | Árbol sin `jejeje/`: solo Angular, Spring, n8n, Docker, documentación de raíz, etc. |
+| `otros` | Árbol sin `jejeje/`: solo Angular, Spring, n8n, Docker, documentación de raíz, etc. Ver [README de la rama `otros`](README_RAMA_OTROS.md). |
 
 Para un desarrollo normal, **trabajar en `main`** o en feature branches a partir de `main` es lo habitual. Las ramas `frontend` y `backend` se generan con `git subtree split` y sirven de **vista o despliegue** del subproyecto.
 
