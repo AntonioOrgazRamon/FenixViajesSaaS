@@ -11,6 +11,7 @@ export const leadSourceEnum = z.enum([
 ]);
 
 export const leadStatusEnum = z.enum([
+  'PENDING_REVIEW',
   'NEW',
   'QUALIFYING',
   'QUALIFIED',
@@ -40,6 +41,29 @@ export const intakeBodySchema = z.object({
     .optional(),
   message: z.string().max(20000).optional(),
   context: z.record(z.string(), z.any()).optional(),
+  raw_payload: z.unknown().optional(),
+});
+
+const reasonablePhoneRegex = /^[+()\-.\s\d]{7,20}$/;
+
+export const publicLeadFormSchema = z.object({
+  company_slug: z.string().min(1, 'Falta la empresa destino'),
+  source_detail: z.string().max(150).optional(),
+  origin: z.string().max(120).optional(),
+  destination: z.string().trim().min(1, 'Falta el destino'),
+  travel_date: z
+    .string()
+    .min(1, 'La fecha no es válida')
+    .refine((v) => !Number.isNaN(new Date(v).getTime()), 'La fecha no es válida'),
+  seats: z.coerce.number().int().gt(0, 'El número de plazas debe ser mayor que 0'),
+  first_name: z.string().trim().min(1, 'Falta el nombre'),
+  last_name: z.string().trim().min(1, 'Faltan los apellidos'),
+  email: z.string().trim().min(1, 'Falta el correo.').email('El correo no es válido.'),
+  phone: z
+    .string()
+    .trim()
+    .min(1, 'Falta el teléfono')
+    .refine((v) => reasonablePhoneRegex.test(v), 'El teléfono no tiene un formato válido'),
   raw_payload: z.unknown().optional(),
 });
 

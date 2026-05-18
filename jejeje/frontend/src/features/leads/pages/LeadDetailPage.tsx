@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Sparkles } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -8,8 +9,10 @@ import { unwrap } from '../../../lib/api';
 import { getApiErrorMessage } from '../../../lib/errors';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { PanelCard } from '../../../components/ui/PanelCard';
-import type { LeadDetailBundle, UserListItem } from '../../../types/domain';
+import type { LeadDetailBundle, SmartProposalState, UserListItem } from '../../../types/domain';
 import { useAuthStore } from '../../../store/authStore';
+import { SmartProposalSection } from '../components/SmartProposalSection';
+import { normalizeSmartProposalState } from '../normalizeSmartProposal';
 
 const editSchema = z.object({
   status: z.string(),
@@ -50,6 +53,78 @@ const statuses = [
   'LOST',
   'ARCHIVED',
 ];
+
+const smartProposalKey = (leadId: string) => ['lead', leadId, 'smart-proposal'] as const;
+
+function LeadCopilotStrip({ leadId }: { leadId: string }) {
+  const q = useQuery({
+    queryKey: smartProposalKey(leadId),
+    queryFn: async () => {
+      const { data } = await api.get<{ success: boolean; data: SmartProposalState }>(`/leads/${leadId}/smart-proposal`);
+      return normalizeSmartProposalState(unwrap(data) as SmartProposalState);
+    },
+  });
+
+  if (q.isLoading || q.isError || !q.data) {
+    return (
+      <div className="rounded-2xl border border-cyan-500/20 bg-gradient-to-r from-cyan-500/[0.06] to-transparent px-4 py-3 dark:from-cyan-500/[0.1]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-cyan-900 dark:text-cyan-100">
+            <Sparkles className="h-4 w-4 shrink-0 opacity-80" strokeWidth={1.75} />
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide">Copiloto</p>
+              <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                {q.isLoading ? 'Cargando señales de propuesta…' : 'Sin datos de IA todavía.'}
+              </p>
+            </div>
+          </div>
+          <a
+            href="#propuesta"
+            className="shrink-0 rounded-lg border border-cyan-500/30 bg-white/80 px-3 py-1.5 text-xs font-medium text-cyan-900 shadow-sm hover:bg-white dark:border-cyan-500/25 dark:bg-zinc-900/80 dark:text-cyan-100"
+          >
+            Ir a propuesta
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  const st = q.data;
+  const phaseLabel =
+    st.phase === 'ready' ? 'Propuesta lista' : st.phase === 'error' ? 'Error de generación' : 'Sin generar';
+
+  return (
+    <div className="rounded-2xl border border-cyan-500/25 bg-gradient-to-r from-cyan-500/[0.08] via-transparent to-violet-500/[0.05] px-4 py-3 dark:from-cyan-500/[0.12] dark:to-violet-500/[0.06]">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-2.5">
+          <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-cyan-600 dark:text-cyan-300" strokeWidth={1.75} />
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-cyan-900 dark:text-cyan-100">Copiloto</p>
+            <p className="mt-0.5 truncate text-sm text-zinc-800 dark:text-zinc-200">{st.analysis.intention.summary}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-zinc-600 dark:text-zinc-400">
+              <span className="rounded-md border border-cyan-500/20 bg-white/70 px-1.5 py-0.5 font-medium tabular-nums dark:bg-white/[0.06]">
+                Score {st.analysis.overallScore}
+              </span>
+              <span className="rounded-md border border-white/10 px-1.5 py-0.5 dark:border-white/[0.08]">{phaseLabel}</span>
+              {st.vendorNotified ? (
+                <span className="text-emerald-600 dark:text-emerald-400">Vendedor notificado</span>
+              ) : null}
+            </div>
+          </div>
+        </div>
+        <a
+          href="#propuesta"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-b from-cyan-500 to-cyan-600 px-3 py-2 text-xs font-semibold text-white shadow-md shadow-cyan-900/25 hover:brightness-105"
+        >
+          Abrir propuesta IA
+        </a>
+      </div>
+    </div>
+  );
+}
+
+const fieldInput =
+  'mt-1 w-full rounded-lg border border-zinc-200/90 bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-zinc-900/60 dark:text-zinc-100';
 
 export function LeadDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -141,7 +216,7 @@ export function LeadDetailPage() {
     return (
       <div>
         <p className="text-sm text-red-400">Lead no encontrado o error al cargar.</p>
-        <Link to="/leads" className="mt-4 inline-block text-sm text-amber-400 hover:underline">
+        <Link to="/leads" className="mt-4 inline-block text-sm text-cyan-600 hover:underline dark:text-cyan-400">
           ← Volver a leads
         </Link>
       </div>
@@ -160,26 +235,27 @@ export function LeadDetailPage() {
         />
         <button
           type="button"
-          className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-zinc-200 hover:bg-white/[0.06]"
+          className="rounded-xl border border-zinc-200/90 bg-white px-4 py-2 text-sm font-medium text-zinc-800 shadow-sm hover:bg-zinc-50 dark:border-white/10 dark:bg-white/[0.05] dark:text-zinc-200 dark:hover:bg-white/[0.08]"
           onClick={() => navigate('/leads')}
         >
           ← Lista
         </button>
       </div>
 
+      <LeadCopilotStrip leadId={l.id} />
+
+      <SmartProposalSection leadId={l.id} />
+
       <form
         onSubmit={form.handleSubmit((v) => patchMutation.mutate(v))}
         className="grid w-full min-w-0 gap-4 lg:grid-cols-2 xl:gap-5"
       >
         <PanelCard>
-          <h2 className="text-sm font-semibold text-white">Datos principales</h2>
+          <h2 className="text-sm font-semibold text-zinc-900 dark:text-white">Datos principales</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <div>
               <label className="text-xs text-zinc-500">Estado</label>
-              <select
-                className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
-                {...form.register('status')}
-              >
+              <select className={fieldInput} {...form.register('status')}>
                 {statuses.map((s) => (
                   <option key={s} value={s}>
                     {s}
@@ -189,7 +265,7 @@ export function LeadDetailPage() {
             </div>
             <div>
               <label className="text-xs text-zinc-500">Prioridad</label>
-              <select className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm" {...form.register('priority')}>
+              <select className={fieldInput} {...form.register('priority')}>
                 <option value="">—</option>
                 <option value="LOW">LOW</option>
                 <option value="MEDIUM">MEDIUM</option>
@@ -199,38 +275,31 @@ export function LeadDetailPage() {
             </div>
             <div>
               <label className="text-xs text-zinc-500">Nombre</label>
-              <input className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm" {...form.register('first_name')} />
+              <input className={fieldInput} {...form.register('first_name')} />
             </div>
             <div>
               <label className="text-xs text-zinc-500">Apellidos</label>
-              <input className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm" {...form.register('last_name')} />
+              <input className={fieldInput} {...form.register('last_name')} />
             </div>
             <div>
               <label className="text-xs text-zinc-500">Email</label>
-              <input className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm" {...form.register('email')} />
+              <input className={fieldInput} {...form.register('email')} />
             </div>
             <div>
               <label className="text-xs text-zinc-500">Teléfono</label>
-              <input className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm" {...form.register('phone')} />
+              <input className={fieldInput} {...form.register('phone')} />
             </div>
             <div className="sm:col-span-2">
               <label className="text-xs text-zinc-500">Empresa (lead)</label>
-              <input className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm" {...form.register('company_name')} />
+              <input className={fieldInput} {...form.register('company_name')} />
             </div>
             <div className="sm:col-span-2">
               <label className="text-xs text-zinc-500">Mensaje</label>
-              <textarea
-                rows={3}
-                className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
-                {...form.register('message')}
-              />
+              <textarea rows={3} className={fieldInput} {...form.register('message')} />
             </div>
             <div className="sm:col-span-2">
               <label className="text-xs text-zinc-500">Asignado a</label>
-              <select
-                className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
-                {...form.register('assigned_user_id')}
-              >
+              <select className={fieldInput} {...form.register('assigned_user_id')}>
                 <option value="">—</option>
                 {(usersQuery.data ?? []).map((u) => (
                   <option key={u.id} value={u.id}>
@@ -246,7 +315,7 @@ export function LeadDetailPage() {
           <button
             type="submit"
             disabled={patchMutation.isPending}
-            className="mt-4 rounded-xl bg-gradient-to-b from-amber-400 to-amber-600 px-4 py-2 text-sm font-semibold text-zinc-950 disabled:opacity-50"
+            className="mt-4 rounded-xl bg-gradient-to-b from-cyan-500 to-cyan-600 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-cyan-900/20 disabled:opacity-50"
           >
             Guardar cambios
           </button>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { isAxiosError } from 'axios';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, FileText, Loader2, Play, RefreshCw, Trash2, X } from 'lucide-react';
 import { api } from '../../../lib/axios';
 import { unwrap } from '../../../lib/api';
@@ -20,6 +20,7 @@ import {
   appTableWrap,
 } from '../../../lib/appTable';
 import { cn } from '../../../lib/cn';
+import { confirmAction, notifyError, notifySuccess } from '../../../lib/swal';
 
 type TravelDoc = {
   id: string;
@@ -101,12 +102,37 @@ function paginationInfo(page: number, pageSize: number, total: number) {
   return { totalPages, from, to, label };
 }
 
+type TripPageSizeChoice = 10 | 20 | 50 | 'all';
+
+/** Máximo que acepta el listado en backend (ver `TravelTripService.list`). */
+const TRIPS_LIST_MAX_PAGE_SIZE = 5000;
+
+function tripsListFooterLabel(
+  mode: TripPageSizeChoice,
+  page: number,
+  apiPageSize: number,
+  total: number,
+  itemsShown: number,
+): string {
+  if (total <= 0) return '0 resultados';
+  if (mode === 'all') {
+    if (total > TRIPS_LIST_MAX_PAGE_SIZE && itemsShown >= TRIPS_LIST_MAX_PAGE_SIZE) {
+      return `Mostrando los ${itemsShown} más recientes de ${total} (tope ${TRIPS_LIST_MAX_PAGE_SIZE})`;
+    }
+    return itemsShown === total
+      ? `${total} viaje${total === 1 ? '' : 's'}`
+      : `Mostrando ${itemsShown} de ${total} viajes`;
+  }
+  return paginationInfo(page, apiPageSize, total).label;
+}
+
 export function TravelCatalogPage() {
   const user = useAuthStore((s) => s.user);
   const isSuper = user?.role === 'SUPER_ADMIN';
   const [companyId, setCompanyId] = useState('');
   const [docPage, setDocPage] = useState(1);
   const [tripPage, setTripPage] = useState(1);
+  const [tripPageSize, setTripPageSize] = useState<TripPageSizeChoice>(10);
   const [fileBusy, setFileBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [jsonTripId, setJsonTripId] = useState<string | null>(null);
@@ -160,15 +186,19 @@ export function TravelCatalogPage() {
     },
   });
 
+  const effectiveTripRequestPage = tripPageSize === 'all' ? 1 : tripPage;
+  const effectiveTripPageSizeParam = tripPageSize === 'all' ? TRIPS_LIST_MAX_PAGE_SIZE : tripPageSize;
+
   const tripsQ = useQuery<TripListPayload>({
-    queryKey: ['travel-trips', isSuper, companyId, tripPage],
+    queryKey: ['travel-trips', isSuper, companyId, effectiveTripRequestPage, tripPageSize],
     queryFn: async () => {
       const { data: body } = await api.get<{ success: boolean; data: TripListPayload }>('/travel/trips', {
-        params: { page: tripPage, pageSize: 10, ...sp() },
+        params: { page: effectiveTripRequestPage, pageSize: effectiveTripPageSizeParam, ...sp() },
       });
       return unwrap(body);
     },
     enabled: canQuery,
+    placeholderData: keepPreviousData,
     refetchInterval: () => {
       const d = qc.getQueryData<DocListPayload>(['travel-documents', isSuper, companyId, docPage]);
       return d?.items?.some((x) => x.status === 'PROCESSING') ? 1_200 : false;
@@ -238,7 +268,14 @@ export function TravelCatalogPage() {
 
   const deleteDocument = async (id: string) => {
     if (!canQuery) return;
-    if (!window.confirm('¿Eliminar este PDF del servidor y los viajes importados desde él? No se puede deshacer.')) {
+    const ok = await confirmAction({
+      title: 'Eliminar PDF importado',
+      text: 'Se eliminará el PDF del servidor y los viajes importados desde él. Esta acción no se puede deshacer.',
+      confirmText: 'Sí, eliminar',
+      cancelText: 'Cancelar',
+      icon: 'warning',
+    });
+    if (!ok) {
       return;
     }
     setErr(null);
@@ -247,8 +284,10 @@ export function TravelCatalogPage() {
       await api.delete(`/travel/documents/${id}`, { params: sp() });
       await qc.invalidateQueries({ queryKey: ['travel-documents'] });
       await qc.invalidateQueries({ queryKey: ['travel-trips'] });
+      await notifySuccess('Documento eliminado');
     } catch {
       setErr('No se pudo eliminar el documento.');
+      await notifyError('No se pudo eliminar', 'Revisa permisos o inténtalo de nuevo.');
     } finally {
       setDeletingDocId(null);
     }
@@ -256,11 +295,14 @@ export function TravelCatalogPage() {
 
   const clearAllImports = async () => {
     if (!canQuery) return;
-    if (
-      !window.confirm(
-        '¿Borrar todos los PDFs subidos, viajes importados del catálogo y colas de importación de esta empresa? Los viajes creados a mano (sin PDF) se conservan. No se puede deshacer.',
-      )
-    ) {
+    const ok = await confirmAction({
+      title: 'Vaciar importaciones',
+      text: 'Se borrarán todos los PDFs subidos, viajes importados del catálogo y colas de importación de esta empresa. Los viajes creados a mano (sin PDF) se conservan.',
+      confirmText: 'Sí, vaciar todo',
+      cancelText: 'Cancelar',
+      icon: 'warning',
+    });
+    if (!ok) {
       return;
     }
     setErr(null);
@@ -269,8 +311,10 @@ export function TravelCatalogPage() {
       await api.post('/travel/documents/clear', undefined, { params: sp() });
       await qc.invalidateQueries({ queryKey: ['travel-documents'] });
       await qc.invalidateQueries({ queryKey: ['travel-trips'] });
+      await notifySuccess('Importaciones limpiadas');
     } catch {
       setErr('No se pudo vaciar las importaciones.');
+      await notifyError('No se pudo limpiar', 'Inténtalo de nuevo en unos segundos.');
     } finally {
       setClearBusy(false);
     }
@@ -540,23 +584,52 @@ export function TravelCatalogPage() {
         </button>
       </div>
 
-      <div className="mb-2 mt-10 flex flex-wrap items-center justify-between gap-2">
+      <div className="mb-2 mt-10 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">Viajes importados</h2>
-        <button
-          type="button"
-          disabled={!canQuery}
-          onClick={() => {
-            void qc.invalidateQueries({ queryKey: ['travel-trips'] });
-            void tripsQ.refetch();
-          }}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-50 dark:border-white/15 dark:text-zinc-200 dark:hover:bg-white/5"
-          title="Actualizar la lista de viajes (útil al terminar de procesar un PDF)"
-        >
-          <RefreshCw className={cn('h-3.5 w-3.5', tripsQ.isRefetching && 'animate-spin')} aria-hidden />
-          Recargar
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <label
+              className="whitespace-nowrap text-xs font-medium text-zinc-600 dark:text-zinc-400"
+              htmlFor="tc-trip-page-size"
+            >
+              Listado
+            </label>
+            <select
+              id="tc-trip-page-size"
+              className={cn(
+                appSelectFilter,
+                'w-auto min-w-[10.5rem] shrink-0',
+                'bg-white scheme-light dark:bg-zinc-900/90 dark:scheme-dark',
+              )}
+              value={tripPageSize === 'all' ? 'all' : String(tripPageSize)}
+              onChange={(e) => {
+                const v = e.target.value;
+                setTripPageSize(v === 'all' ? 'all' : (Number(v) as 10 | 20 | 50));
+                setTripPage(1);
+              }}
+            >
+              <option value="10">10 por página</option>
+              <option value="20">20 por página</option>
+              <option value="50">50 por página</option>
+              <option value="all">Todos (hasta {TRIPS_LIST_MAX_PAGE_SIZE})</option>
+            </select>
+          </div>
+          <button
+            type="button"
+            disabled={!canQuery}
+            onClick={() => {
+              void qc.invalidateQueries({ queryKey: ['travel-trips'] });
+              void tripsQ.refetch();
+            }}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-50 dark:border-white/15 dark:text-zinc-200 dark:hover:bg-white/5"
+            title="Actualizar la lista de viajes (útil al terminar de procesar un PDF)"
+          >
+            <RefreshCw className={cn('h-3.5 w-3.5', tripsQ.isRefetching && 'animate-spin')} aria-hidden />
+            Recargar
+          </button>
+        </div>
       </div>
-      {tripsQ.isLoading ? (
+      {!tripsQ.data ? (
         <p className="text-sm text-zinc-500">Cargando viajes…</p>
       ) : (
         <div className={appTableWrap}>
@@ -602,7 +675,7 @@ export function TravelCatalogPage() {
         <button
           type="button"
           className={cn('shrink-0 rounded px-3 py-1 text-sm text-zinc-500', appInputBorder)}
-          disabled={tripPage <= 1 || !tripsQ.data}
+          disabled={tripPageSize === 'all' || tripPage <= 1 || !tripsQ.data}
           onClick={() => setTripPage((p) => p - 1)}
         >
           ← Anterior
@@ -614,7 +687,13 @@ export function TravelCatalogPage() {
             aria-atomic="true"
             title="Número de página respecto al total, e ítems mostrados en esta página"
           >
-            {paginationInfo(tripPage, tripsQ.data.pageSize, tripsQ.data.total).label}
+            {tripsListFooterLabel(
+              tripPageSize,
+              tripPage,
+              tripsQ.data.pageSize,
+              tripsQ.data.total,
+              tripsQ.data.items.length,
+            )}
           </p>
         ) : (
           <span className="flex-1" />
@@ -622,7 +701,11 @@ export function TravelCatalogPage() {
         <button
           type="button"
           className={cn('shrink-0 rounded px-3 py-1 text-sm text-zinc-500', appInputBorder)}
-          disabled={!tripsQ.data || tripPage * tripsQ.data.pageSize >= tripsQ.data.total}
+          disabled={
+            tripPageSize === 'all' ||
+            !tripsQ.data ||
+            tripPage * tripsQ.data.pageSize >= tripsQ.data.total
+          }
           onClick={() => setTripPage((p) => p + 1)}
         >
           Siguiente →

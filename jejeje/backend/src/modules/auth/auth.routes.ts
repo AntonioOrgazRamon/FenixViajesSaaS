@@ -33,17 +33,8 @@ router.post(
   authController.resetPassword.bind(authController)
 );
 
-router.get('/google/start', (_req, res) => {
-  res.status(501).json({
-    success: false,
-    error: { code: 'NOT_IMPLEMENTED', message: 'OAuth Google pendiente de configuración en el servidor' },
-  });
-});
-router.get('/google/callback', (_req, res) => {
-  res.status(501).json({
-    success: false,
-    error: { code: 'NOT_IMPLEMENTED', message: 'OAuth Google pendiente de configuración en el servidor' },
-  });
-});
+router.get('/google/start', authController.googleStart.bind(authController));
+router.get('/google/callback', authController.googleCallback.bind(authController));
+router.post('/google/exchange', authController.googleExchange.bind(authController));
 
 export default router;

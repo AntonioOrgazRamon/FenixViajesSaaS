@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { validateNewPasswordForReset } from '../../common/validation/passwordPolicy';
 
 export const createCompanySchema = z.object({
   company: z.object({
@@ -10,8 +11,13 @@ export const createCompanySchema = z.object({
     firstName: z.string().min(2),
     lastName: z.string().min(2),
     phone: z.string().optional(),
-    password: z.string().min(6), // En un caso real se generaría o enviaría por email
-  })
+    password: z.string().superRefine((val, ctx) => {
+      const r = validateNewPasswordForReset(val);
+      if (!r.ok) {
+        ctx.addIssue({ code: 'custom', message: r.message });
+      }
+    }),
+  }),
 });
 
 export const updateCompanySchema = z.object({

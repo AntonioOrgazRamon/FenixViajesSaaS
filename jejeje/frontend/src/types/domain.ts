@@ -102,7 +102,50 @@ export type LeadListItem = {
   companyName: string | null;
   createdAt: string;
   updatedAt: string;
+  travel?: {
+    destination: string | null;
+    travelDate: string | null;
+    seats: number | null;
+  };
   assignedUser: { id: string; email: string; firstName: string; lastName: string } | null;
+};
+
+export type SmartProposalTier = 'recommended' | 'economic' | 'premium';
+
+export type SmartProposalTripVm = {
+  id: string;
+  tier: SmartProposalTier;
+  title: string;
+  mainDestination: string | null;
+  durationDays: number | null;
+  indicativePrice: number | null;
+  currency: string | null;
+  matchScore: number;
+  highlights: string[];
+};
+
+export type SmartProposalAnalysis = {
+  intention: { summary: string; confidence: number; signals: string[] };
+  missingData: string[];
+  overallScore: number;
+  matches: string[];
+  misses: string[];
+  talkTrack: string;
+  recommendedTrips: SmartProposalTripVm[];
+};
+
+export type SmartProposalState = {
+  phase: 'none' | 'ready' | 'error';
+  proposalId: string | null;
+  proposalStatus: string | null;
+  versionNumber: number | null;
+  updatedAt: string | null;
+  vendorNotified: boolean;
+  vendorNotifiedAt: string | null;
+  lastError: string | null;
+  analysis: SmartProposalAnalysis;
+  htmlAvailable: boolean;
+  pdfAvailable: boolean;
 };
 
 export type LeadDetailBundle = {

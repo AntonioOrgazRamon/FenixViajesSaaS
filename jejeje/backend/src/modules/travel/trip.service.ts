@@ -28,7 +28,8 @@ export class TravelTripService {
     query: { status?: TravelTripStatus; page?: number; pageSize?: number },
   ) {
     const page = query.page || 1;
-    const take = Math.min(100, Math.max(1, query.pageSize || 20));
+    /** Catálogo admin: permitir listados grandes (selector "todos" en UI). */
+    const take = Math.min(5000, Math.max(1, query.pageSize || 20));
     const skip = (Math.max(1, page) - 1) * take;
 
     const where: Prisma.TravelTripWhereInput = { companyId };

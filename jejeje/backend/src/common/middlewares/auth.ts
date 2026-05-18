@@ -34,6 +34,10 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
       throw new UnauthorizedError('Sesión inválida o revocada');
     }
 
+    if (session.userId !== decoded.userId) {
+      throw new UnauthorizedError('Sesión inválida o revocada');
+    }
+
     req.user = {
       id: user.id,
       role: user.role,

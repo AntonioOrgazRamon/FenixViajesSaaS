@@ -1,9 +1,11 @@
-import OpenAI from 'openai';
+import { createHash } from 'crypto';
+import { OpenAIOperationType } from '@prisma/client';
 import { config } from '../../common/config';
 import { tripAiExtractZ, type TripAiExtract } from './trip-ai.schemas';
 import { logger } from '../../common/logger';
 import { cleanRepeatedCatalogHeaders } from './trip-text-cleaning.service';
 import { filterHotelsForPersistence } from './trip-hotels-extract.service';
+import { guardedChatCompletion } from '../openai/openai-guarded.executor';
 
 /**
  * FASE 5 — Convierte un bloque de texto de un viaje en JSON validado con Zod.
@@ -11,19 +13,20 @@ import { filterHotelsForPersistence } from './trip-hotels-extract.service';
  */
 export class TripAIExtractionService {
   async extractFromBlock(input: {
+    companyId: string;
+    userId?: string | null;
     titleHint: string;
     pageStart: number;
     pageEnd: number;
     text: string;
   }): Promise<{ data: TripAiExtract; usedModel: boolean }> {
-    if (!config.OPENAI_API_KEY) {
+    if (!config.OPENAI_API_KEY?.trim()) {
       return {
         data: fallbackExtraction(input),
         usedModel: false,
       };
     }
 
-    const client = new OpenAI({ apiKey: config.OPENAI_API_KEY });
     const system = `Eres un extractor de catálogos turísticos. Devuelves SOLO JSON válido según el esquema pedido.
 Reglas estrictas:
 - No inventes precios, fechas, hoteles ni destinos que no aparezcan en el texto.
@@ -52,16 +55,31 @@ highlights: {text, order}.
 observations: {text, order}.`;
 
     try {
-      const res = await client.chat.completions.create({
+      const idempotencyKey = createHash('sha256')
+        .update(`${input.companyId}:${input.pageStart}:${input.pageEnd}:${textForModel.slice(0, 8000)}`)
+        .digest('hex')
+        .slice(0, 40);
+
+      const res = await guardedChatCompletion({
+        companyId: input.companyId,
+        userId: input.userId,
+        operationType: OpenAIOperationType.TRIP_PDF_EXTRACTION,
         model: config.TRAVEL_OPENAI_MODEL,
-        response_format: { type: 'json_object' },
         temperature: 0.1,
+        responseFormat: { type: 'json_object' },
+        estimatedOutputTokens: 4096,
+        idempotencyKey,
         messages: [
           { role: 'system', content: system },
           { role: 'user', content: user },
         ],
       });
-      const raw = res.choices[0]?.message?.content;
+
+      if (!res.ok) {
+        return { data: fallbackExtraction(input), usedModel: false };
+      }
+
+      const raw = res.content;
       if (!raw) {
         return { data: fallbackExtraction(input), usedModel: false };
       }

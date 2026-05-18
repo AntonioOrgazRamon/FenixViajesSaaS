@@ -1,4 +1,9 @@
+/**
+ * Correo transaccional: {@link sendPasswordResetEmail}.
+ * Correo operativo (CRM, avisos internos): {@link sendOperationalEmail}.
+ */
 import nodemailer from 'nodemailer';
+import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 import { config } from '../../common/config';
 import { logger } from '../../common/logger';
 
@@ -8,7 +13,7 @@ function smtpAuthUser() {
     : config.EMAIL_FROM) || undefined;
 }
 
-function buildTransport() {
+function buildTransport(): nodemailer.Transporter<SMTPTransport.SentMessageInfo> | null {
   if (!config.SMTP_HOST) return null;
   const user = smtpAuthUser();
   const pass = config.SMTP_PASS ?? '';
@@ -23,7 +28,10 @@ function buildTransport() {
   });
 }
 
-export type SendPasswordResetResult = { sent: true } | { sent: false; error: string };
+export type SendEmailResult = { sent: true } | { sent: false; error: string };
+
+/** @deprecated usar SendEmailResult */
+export type SendPasswordResetResult = SendEmailResult;
 
 const transport = (() => {
   try {
@@ -34,26 +42,64 @@ const transport = (() => {
   }
 })();
 
+export type OperationalEmail = {
+  to: string;
+  subject: string;
+  text: string;
+  html?: string;
+};
+
 /**
- * No registra el token. Si no hay SMTP, `sent: false` y se registra solo el destino en debug.
+ * Envío genérico para correos operativos (notificaciones CRM, avisos internos, etc.).
+ * Misma política que reset: sin SMTP o sin EMAIL_FROM → `sent: false` y log.
+ */
+export async function sendOperationalEmail(mail: OperationalEmail): Promise<SendEmailResult> {
+  const from = config.EMAIL_FROM;
+  if (!from) {
+    logger.info(
+      { to: mail.to, hasSmtp: !!config.SMTP_HOST },
+      'EMAIL_FROM no configurado: no se envía correo operativo'
+    );
+    return { sent: false, error: 'EMAIL_NOT_CONFIGURED' };
+  }
+
+  if (!transport) {
+    const needPass = !!(config.SMTP_HOST && !config.SMTP_PASS);
+    logger.warn(
+      { to: mail.to, needAppPassword: needPass },
+      needPass
+        ? 'SMTP: falta SMTP_PASS (contraseña de aplicación). Revisa .env'
+        : 'SMTP no configurado. Define SMTP_HOST, EMAIL_FROM y credenciales.'
+    );
+    return { sent: false, error: 'SMTP_NOT_CONFIGURED' };
+  }
+
+  try {
+    await transport.sendMail({
+      from,
+      to: mail.to,
+      subject: mail.subject,
+      text: mail.text,
+      html: mail.html ?? mail.text,
+    });
+    return { sent: true };
+  } catch (e) {
+    const err = e instanceof Error ? e.message : String(e);
+    logger.error({ to: mail.to, err }, 'Fallo al enviar correo operativo');
+    return { sent: false, error: err };
+  }
+}
+
+/**
+ * No registra el token. Reutiliza el envío operativo.
  */
 export async function sendPasswordResetEmail(
   to: string,
   resetPathWithToken: string
 ): Promise<SendPasswordResetResult> {
-  const from = config.EMAIL_FROM;
-  if (!from) {
-    logger.info(
-      { to, hasSmtp: !!config.SMTP_HOST },
-      'EMAIL_FROM no configurado: no se envía email de restablecimiento (revisa el log en entorno con SMTP)'
-    );
-    return { sent: false, error: 'EMAIL_NOT_CONFIGURED' };
-  }
-
-  const publicUrl = `${config.FRONTEND_BASE_URL.replace(/\/$/, '')}${resetPathWithToken}`;
-
   const ttl = config.PASSWORD_RESET_TTL_MINUTES;
   const appName = config.APP_NAME;
+  const publicUrl = `${config.FRONTEND_BASE_URL.replace(/\/$/, '')}${resetPathWithToken}`;
   const subject = `Restablece tu contraseña — ${appName}`;
   const text = `Hola,
 
@@ -75,31 +121,13 @@ Equipo de ${appName}
 <p>Si no has sido tú, ignora este correo.</p>
 <p>— ${escapeHtml(appName)}</p>`;
 
-  if (!transport) {
-    const needPass = !!(config.SMTP_HOST && !config.SMTP_PASS);
-    logger.warn(
-      { to, needAppPassword: needPass },
-      needPass
-        ? 'SMTP: falta SMTP_PASS (contraseña de aplicación de Google). Cuenta: revisa comentarios en .env'
-        : 'SMTP no configurado. Define SMTP_HOST, EMAIL_FROM y credenciales para envío real.'
-    );
-    return { sent: false, error: 'SMTP_NOT_CONFIGURED' };
-  }
-
-  try {
-    await transport.sendMail({ from, to, subject, text, html });
-    return { sent: true };
-  } catch (e) {
-    const err = e instanceof Error ? e.message : String(e);
-    logger.error({ to, err }, 'Fallo al enviar email de restablecimiento');
-    return { sent: false, error: err };
-  }
+  return sendOperationalEmail({ to, subject, text, html });
 }
 
-function escapeHtml(s: string) {
+export function escapeHtml(s: string) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function escapeAttr(s: string) {
+export function escapeAttr(s: string) {
   return s.replace(/"/g, '&quot;');
 }

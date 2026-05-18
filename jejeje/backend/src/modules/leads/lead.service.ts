@@ -7,6 +7,8 @@ import {
   Prisma,
 } from '@prisma/client';
 import prisma from '../../infrastructure/db';
+import { leadIntentExtractorAgent } from '../../services/leads/lead-intent-extractor.agent';
+import { LEAD_INTENT_EXTRACTOR_AGENT_KEY } from '../../services/leads/lead-intent-extractor.schema';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../common/errors/AppError';
 import { isValidLeadStatusTransition } from './lead-status';
 import type { z } from 'zod';
@@ -15,12 +17,14 @@ import type {
   listLeadsQuerySchema,
   patchLeadSchema,
   patchLeadDetailsSchema,
+  publicLeadFormSchema,
 } from './lead.schema';
 
 type IntakeBody = z.infer<typeof intakeBodySchema>;
 type ListQuery = z.infer<typeof listLeadsQuerySchema>;
 type PatchLead = z.infer<typeof patchLeadSchema>;
 type PatchDetails = z.infer<typeof patchLeadDetailsSchema>;
+type PublicLeadForm = z.infer<typeof publicLeadFormSchema>;
 
 const STRIP_RAW_KEYS = new Set(
   ['companyid', 'company_id', 'assigned_user_id', 'assigneduserid', 'role', 'status', 'internal'],
@@ -48,6 +52,181 @@ async function assertUserInCompany(userId: string, companyId: string) {
 }
 
 export class LeadService {
+  private extractTravelSnapshot(normalizedPayload: unknown): {
+    destination: string | null;
+    travelDate: string | null;
+    seats: number | null;
+  } {
+    const p = normalizedPayload as
+      | {
+          travel?: { destination?: string; travelDate?: string; seats?: number };
+        }
+      | null
+      | undefined;
+    return {
+      destination: p?.travel?.destination?.trim() || null,
+      travelDate: p?.travel?.travelDate?.trim() || null,
+      seats: typeof p?.travel?.seats === 'number' ? p.travel.seats : null,
+    };
+  }
+
+  async createFromPublicForm(
+    body: PublicLeadForm,
+    integrationHeader: string | undefined,
+    ip?: string,
+    userAgent?: string
+  ) {
+    const company = await prisma.company.findFirst({
+      where: { slug: body.company_slug, status: 'ACTIVE' },
+    });
+    if (!company) throw new NotFoundError('Empresa no encontrada');
+
+    if (company.integrationToken) {
+      const token = integrationHeader?.trim();
+      if (!token || token !== company.integrationToken) {
+        throw new ForbiddenError('Token de integración inválido o ausente');
+      }
+    }
+
+    const email = body.email.trim().toLowerCase();
+    const phone = body.phone.trim();
+    const destination = body.destination.trim();
+    const travelDateIso = new Date(body.travel_date).toISOString();
+    const now = new Date();
+    const shortWindow = new Date(now.getTime() - 6 * 60 * 60 * 1000);
+
+    const recent = await prisma.lead.findMany({
+      where: {
+        companyId: company.id,
+        createdAt: { gte: shortWindow },
+        email,
+        phone,
+        deletedAt: null,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+    });
+
+    const duplicate = recent.find((r) => {
+      const t = this.extractTravelSnapshot(r.normalizedPayload);
+      return t.destination === destination && t.travelDate === travelDateIso;
+    });
+
+    const normalizedPayload = {
+      source_detail: body.source_detail ?? null,
+      origin: body.origin ?? null,
+      travel: {
+        destination,
+        travelDate: travelDateIso,
+        seats: body.seats,
+      },
+      contact: {
+        first_name: body.first_name,
+        last_name: body.last_name,
+        full_name: `${body.first_name} ${body.last_name}`.trim(),
+        email,
+        phone,
+      },
+    };
+    const rawPayload = sanitizeRawPayload(body.raw_payload ?? {});
+
+    if (duplicate) {
+      await prisma.leadActivity.create({
+        data: {
+          companyId: company.id,
+          leadId: duplicate.id,
+          actorType: LeadActorType.SYSTEM,
+          activityType: LeadActivityType.EXTERNAL_EVENT,
+          title: 'Posible duplicado detectado',
+          description: 'Formulario público con datos equivalentes en ventana corta',
+          metadata: {
+            source: body.origin ?? body.source_detail ?? 'web_form',
+            duplicateWindowHours: 6,
+            ip,
+            userAgent,
+          } as Prisma.InputJsonValue,
+        },
+      });
+      return {
+        id: duplicate.id,
+        status: duplicate.status,
+        duplicated: true,
+        message: 'Solicitud recibida correctamente.',
+      };
+    }
+
+    const lead = await prisma.$transaction(async (tx) => {
+      const created = await tx.lead.create({
+        data: {
+          companyId: company.id,
+          source: 'WEB_FORM',
+          sourceDetail: body.source_detail ?? body.origin ?? 'public-form',
+          status: 'PENDING_REVIEW',
+          firstName: body.first_name,
+          lastName: body.last_name,
+          fullName: `${body.first_name} ${body.last_name}`.trim(),
+          email,
+          phone,
+          rawPayload: rawPayload === undefined ? Prisma.JsonNull : (rawPayload as Prisma.InputJsonValue),
+          normalizedPayload: normalizedPayload as Prisma.InputJsonValue,
+        },
+      });
+
+      await tx.leadDetail.create({
+        data: {
+          leadId: created.id,
+          companyId: company.id,
+          currentContext: {
+            formOrigin: body.origin ?? null,
+            destination,
+            travelDate: travelDateIso,
+            seats: body.seats,
+          } as Prisma.InputJsonValue,
+          travelContext: {
+            destination,
+            travelDate: travelDateIso,
+            seats: body.seats,
+          } as Prisma.InputJsonValue,
+        },
+      });
+
+      await tx.leadActivity.create({
+        data: {
+          companyId: company.id,
+          leadId: created.id,
+          actorType: LeadActorType.SYSTEM,
+          activityType: LeadActivityType.CREATED,
+          title: 'Lead creado desde formulario público',
+          description: body.origin ?? body.source_detail ?? null,
+          metadata: { ip, userAgent, destination, travelDate: travelDateIso, seats: body.seats } as Prisma.InputJsonValue,
+        },
+      });
+
+      return created;
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        companyId: company.id,
+        action: 'LEAD_CREATED',
+        targetType: 'LEAD',
+        targetId: lead.id,
+        result: 'SUCCESS',
+        metadata: {
+          source: 'WEB_FORM',
+          origin: body.origin ?? null,
+          destination,
+          travelDate: travelDateIso,
+          seats: body.seats,
+        } as Prisma.InputJsonValue,
+        ipAddress: ip,
+        userAgent,
+      },
+    });
+
+    return { id: lead.id, status: lead.status, duplicated: false, message: 'Solicitud recibida correctamente.' };
+  }
+
   async createFromIntake(
     body: IntakeBody,
     integrationHeader: string | undefined,
@@ -93,7 +272,7 @@ export class LeadService {
           companyId: company.id,
           source: body.source,
           sourceDetail: body.source_detail,
-          status: 'NEW',
+          status: 'PENDING_REVIEW',
           firstName,
           lastName,
           fullName,
@@ -125,24 +304,6 @@ export class LeadService {
         },
       });
 
-      await tx.leadAgentRun.create({
-        data: {
-          companyId: company.id,
-          leadId: created.id,
-          agentKey: 'default-intake',
-          triggerType: LeadAgentTriggerType.ON_CREATE,
-          status: LeadAgentRunStatus.SUCCESS,
-          outputPayload: { message: 'MVP: sin cola real' } as Prisma.InputJsonValue,
-          startedAt: new Date(),
-          finishedAt: new Date(),
-        },
-      });
-
-      await tx.lead.update({
-        where: { id: created.id },
-        data: { lastAgentRunAt: new Date() },
-      });
-
       return created;
     });
 
@@ -157,6 +318,12 @@ export class LeadService {
         ipAddress: ip,
         userAgent,
       },
+    });
+
+    await leadIntentExtractorAgent.execute({
+      companyId: company.id,
+      leadId: lead.id,
+      triggerType: LeadAgentTriggerType.ON_CREATE,
     });
 
     return { id: lead.id, status: lead.status };
@@ -213,6 +380,7 @@ export class LeadService {
     return {
       items: rows.map((r) => ({
         ...r,
+        travel: this.extractTravelSnapshot(r.normalizedPayload),
         assignedUser: r.assignedUser,
         lastMovementAt: r.updatedAt,
       })),
@@ -590,24 +758,36 @@ export class LeadService {
 
   async runAgentsManual(companyId: string, leadId: string, actorUserId: string, actorRole: string, keys?: string[]) {
     await this.getById(companyId, leadId);
-    const agentKeys = keys?.length ? keys : ['manual-default'];
+    const agentKeys = keys?.length ? keys : [LEAD_INTENT_EXTRACTOR_AGENT_KEY];
 
-    const runs = await prisma.$transaction(
-      agentKeys.map((agentKey) =>
-        prisma.leadAgentRun.create({
+    const runs = [];
+    for (const agentKey of agentKeys) {
+      const resolvedKey = agentKey === 'manual-default' ? LEAD_INTENT_EXTRACTOR_AGENT_KEY : agentKey;
+      if (resolvedKey === LEAD_INTENT_EXTRACTOR_AGENT_KEY) {
+        const { runId } = await leadIntentExtractorAgent.execute({
+          companyId,
+          leadId,
+          triggerType: LeadAgentTriggerType.MANUAL,
+          actorUserId,
+        });
+        const row = await prisma.leadAgentRun.findUniqueOrThrow({ where: { id: runId } });
+        runs.push(row);
+      } else {
+        const stub = await prisma.leadAgentRun.create({
           data: {
             companyId,
             leadId,
             agentKey,
             triggerType: LeadAgentTriggerType.MANUAL,
             status: LeadAgentRunStatus.SUCCESS,
-            outputPayload: { message: 'MVP stub' } as Prisma.InputJsonValue,
+            outputPayload: { message: 'MVP stub: agente no implementado' } as Prisma.InputJsonValue,
             startedAt: new Date(),
             finishedAt: new Date(),
           },
-        }),
-      ),
-    );
+        });
+        runs.push(stub);
+      }
+    }
 
     await prisma.lead.update({
       where: { id: leadId },
@@ -626,16 +806,20 @@ export class LeadService {
       },
     });
 
-    for (const _ of runs) {
+    for (const r of runs) {
       await prisma.auditLog.create({
         data: {
           companyId,
           actorUserId,
           actorRole,
-          action: 'LEAD_AGENT_RUN_SUCCESS',
+          action:
+            r.status === LeadAgentRunStatus.SUCCESS
+              ? 'LEAD_AGENT_RUN_SUCCESS'
+              : 'LEAD_AGENT_RUN_FAILED',
           targetType: 'LEAD',
           targetId: leadId,
-          result: 'SUCCESS',
+          result: r.status === LeadAgentRunStatus.SUCCESS ? 'SUCCESS' : 'FAILURE',
+          metadata: { agentKey: r.agentKey, runStatus: r.status } as Prisma.InputJsonValue,
         },
       });
     }

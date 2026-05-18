@@ -29,6 +29,25 @@ type UpdateProfileBody = z.infer<typeof updateProfileExtendedSchema>;
 const GENERIC_FORGOT_RESPONSE = {
   message: 'Si el correo existe en nuestro sistema, recibirás un enlace para restablecer tu contraseña.',
 };
+const GOOGLE_AUTH_BASE_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
+const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
+const GOOGLE_TOKEN_INFO_URL = 'https://oauth2.googleapis.com/tokeninfo';
+const OAUTH_STATE_TTL_SECONDS = 5 * 60;
+
+type GoogleIdTokenClaims = {
+  sub: string;
+  email: string;
+  email_verified: 'true' | 'false';
+  given_name?: string;
+  family_name?: string;
+  hd?: string;
+};
+type OAuthBridgePayload = {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+};
+const googleBridgeStore = new Map<string, OAuthBridgePayload>();
 
 function normalizeEmail(s: string) {
   return s.trim().toLowerCase();
@@ -61,6 +80,219 @@ function genericResetLinkError() {
 }
 
 export class AuthService {
+  consumeGoogleBridgeCode(code: string) {
+    const rec = googleBridgeStore.get(code);
+    if (!rec) throw new UnauthorizedError('Código OAuth inválido o expirado');
+    googleBridgeStore.delete(code);
+    if (rec.expiresAt < Date.now()) {
+      throw new UnauthorizedError('Código OAuth expirado');
+    }
+    return { accessToken: rec.accessToken, refreshToken: rec.refreshToken };
+  }
+
+  private ensureGoogleConfigured() {
+    if (!config.GOOGLE_CLIENT_ID || !config.GOOGLE_CLIENT_SECRET || !config.GOOGLE_REDIRECT_URI) {
+      throw new ValidationError('Google OAuth no está configurado en el servidor');
+    }
+  }
+
+  private signGoogleState() {
+    const stateSecret = config.GOOGLE_OAUTH_STATE_SECRET || config.JWT_SECRET;
+    return jwt.sign({ nonce: uuidv4() }, stateSecret, { expiresIn: OAUTH_STATE_TTL_SECONDS });
+  }
+
+  private verifyGoogleState(state: string) {
+    const stateSecret = config.GOOGLE_OAUTH_STATE_SECRET || config.JWT_SECRET;
+    try {
+      jwt.verify(state, stateSecret);
+    } catch {
+      throw new UnauthorizedError('Estado OAuth inválido o expirado');
+    }
+  }
+
+  private async issueSessionForUser(
+    user: {
+      id: string;
+      companyId: string | null;
+      role: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+      theme: 'LIGHT' | 'DARK' | 'SYSTEM';
+      avatarType: 'DEFAULT' | 'UPLOADED';
+      avatarUrl: string | null;
+      avatarInitials: string | null;
+      avatarBackgroundColor: string | null;
+      avatarTextColor: string | null;
+      avatarShape: 'CIRCLE' | 'ROUNDED' | 'SQUARE';
+    },
+    ipAddress?: string,
+    userAgent?: string,
+    deviceName?: string
+  ) {
+    const refreshTokenId = uuidv4();
+    const refreshTokenHash = await bcrypt.hash(refreshTokenId, 10);
+
+    const session = await prisma.session.create({
+      data: {
+        userId: user.id,
+        companyId: user.companyId,
+        refreshTokenHash,
+        ipAddress,
+        userAgent,
+        deviceName,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      },
+    });
+
+    const refreshToken = `${session.id}:${refreshTokenId}`;
+    const accessToken = jwt.sign({ userId: user.id, sessionId: session.id }, config.JWT_SECRET, { expiresIn: '15m' });
+    const avatar = buildClientAvatar(user);
+
+    return {
+      accessToken,
+      refreshToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        theme: user.theme,
+        avatar,
+        avatar_url: legacyAvatarUrlFrom(avatar),
+      },
+    };
+  }
+
+  getGoogleStartUrl() {
+    this.ensureGoogleConfigured();
+    const state = this.signGoogleState();
+    const params = new URLSearchParams({
+      client_id: config.GOOGLE_CLIENT_ID!,
+      redirect_uri: config.GOOGLE_REDIRECT_URI!,
+      response_type: 'code',
+      scope: 'openid email profile',
+      state,
+      prompt: 'select_account',
+    });
+    if (config.GOOGLE_ALLOWED_HOSTED_DOMAIN) {
+      params.set('hd', config.GOOGLE_ALLOWED_HOSTED_DOMAIN);
+    }
+    return `${GOOGLE_AUTH_BASE_URL}?${params.toString()}`;
+  }
+
+  async loginWithGoogle(code: string, state: string, ipAddress?: string, userAgent?: string) {
+    this.ensureGoogleConfigured();
+    this.verifyGoogleState(state);
+
+    const tokenRes = await fetch(GOOGLE_TOKEN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: config.GOOGLE_CLIENT_ID!,
+        client_secret: config.GOOGLE_CLIENT_SECRET!,
+        redirect_uri: config.GOOGLE_REDIRECT_URI!,
+        grant_type: 'authorization_code',
+      }).toString(),
+    });
+    if (!tokenRes.ok) throw new UnauthorizedError('No se pudo completar OAuth con Google');
+
+    const tokenBody = (await tokenRes.json()) as { id_token?: string };
+    if (!tokenBody.id_token) throw new UnauthorizedError('Google no devolvió id_token');
+
+    const infoRes = await fetch(`${GOOGLE_TOKEN_INFO_URL}?id_token=${encodeURIComponent(tokenBody.id_token)}`);
+    if (!infoRes.ok) throw new UnauthorizedError('No se pudo validar identidad con Google');
+    const claims = (await infoRes.json()) as GoogleIdTokenClaims & { aud?: string };
+
+    if (claims.aud !== config.GOOGLE_CLIENT_ID) throw new UnauthorizedError('Token de Google inválido para esta app');
+    if (claims.email_verified !== 'true' || !claims.email) throw new UnauthorizedError('Cuenta de Google sin email verificado');
+    if (config.GOOGLE_ALLOWED_HOSTED_DOMAIN && claims.hd !== config.GOOGLE_ALLOWED_HOSTED_DOMAIN) {
+      throw new ForbiddenError('Dominio de Google no permitido');
+    }
+
+    const email = normalizeEmail(claims.email);
+    const googleSub = claims.sub;
+
+    let user = await prisma.user.findFirst({
+      where: {
+        OR: [{ googleId: googleSub }, { email }],
+      },
+      select: {
+        ...userCoreNoPreferenceColumns,
+        company: { select: companyListSelect },
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedError('No existe una cuenta permitida para este correo en la plataforma');
+    }
+    if (user.status === 'SUSPENDED') throw new ForbiddenError('USER_SUSPENDED');
+    if (user.status === 'LOCKED') throw new ForbiddenError('USER_LOCKED');
+    if (user.status === 'DELETED') throw new ForbiddenError('USER_DELETED');
+    if (user.company && user.company.status !== 'ACTIVE') throw new ForbiddenError('COMPANY_SUSPENDED');
+    if (user.googleId && user.googleId !== googleSub) throw new UnauthorizedError('Cuenta de Google no vinculada con este usuario');
+
+    const nextAuthProvider =
+      user.authProvider === AuthProvider.LOCAL ? AuthProvider.LOCAL_GOOGLE : AuthProvider.GOOGLE;
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        googleId: googleSub,
+        authProvider: nextAuthProvider,
+        failedLoginAttempts: 0,
+        lastLoginAt: new Date(),
+        firstName: user.firstName || claims.given_name || user.firstName,
+        lastName: user.lastName || claims.family_name || user.lastName,
+      },
+    });
+
+    user = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: {
+        ...userCoreNoPreferenceColumns,
+        company: { select: companyListSelect },
+      },
+    });
+    if (!user) throw new UnauthorizedError('Usuario no encontrado');
+
+    const result = await this.issueSessionForUser(
+      user,
+      ipAddress,
+      userAgent,
+      `google-oauth:${claims.hd ?? 'external'}`
+    );
+
+    await prisma.auditLog.create({
+      data: {
+        actorUserId: user.id,
+        actorRole: user.role,
+        companyId: user.companyId,
+        action: 'AUTH_LOGIN_SUCCESS',
+        targetType: 'USER',
+        targetId: user.id,
+        ipAddress,
+        userAgent,
+        result: 'SUCCESS',
+        reason: 'google_oauth',
+      },
+    });
+
+    return result;
+  }
+
+  createGoogleBridgeCode(payload: { accessToken: string; refreshToken: string }) {
+    const code = uuidv4();
+    googleBridgeStore.set(code, {
+      accessToken: payload.accessToken,
+      refreshToken: payload.refreshToken,
+      expiresAt: Date.now() + 60 * 1000,
+    });
+    return code;
+  }
+
   async login(email: string, password: string, ipAddress?: string, userAgent?: string, deviceName?: string) {
     const user = await prisma.user.findUnique({
       where: { email: normalizeEmail(email) },
@@ -116,29 +348,7 @@ export class AuthService {
       data: { failedLoginAttempts: 0, lastLoginAt: new Date() },
     });
 
-    const refreshTokenId = uuidv4();
-    const refreshTokenHash = await bcrypt.hash(refreshTokenId, 10);
-
-    const session = await prisma.session.create({
-      data: {
-        userId: user.id,
-        companyId: user.companyId,
-        refreshTokenHash,
-        ipAddress,
-        userAgent,
-        deviceName,
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-      },
-    });
-
-    const refreshToken = `${session.id}:${refreshTokenId}`;
-
-    const accessToken = jwt.sign(
-      { userId: user.id, sessionId: session.id },
-      config.JWT_SECRET,
-      { expiresIn: '15m' }
-    );
-
+    const result = await this.issueSessionForUser(user, ipAddress, userAgent, deviceName);
     await prisma.auditLog.create({
       data: {
         actorUserId: user.id,
@@ -153,21 +363,7 @@ export class AuthService {
       }
     });
 
-    const avatar = buildClientAvatar(user);
-    return {
-      accessToken,
-      refreshToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        theme: user.theme,
-        avatar,
-        avatar_url: legacyAvatarUrlFrom(avatar),
-      },
-    };
+    return result;
   }
 
   async logout(sessionId: string) {

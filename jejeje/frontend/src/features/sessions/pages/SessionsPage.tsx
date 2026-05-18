@@ -3,6 +3,7 @@ import { MapPin, Monitor, RefreshCw, Shield } from 'lucide-react';
 import { api } from '../../../lib/axios';
 import { unwrap } from '../../../lib/api';
 import { getApiErrorMessage } from '../../../lib/errors';
+import { confirmAction, notifySuccess } from '../../../lib/swal';
 import { deviceLabelFromUserAgent } from '../../../lib/userAgentLabel';
 import { ProfileSecuritySubPageFrame } from '../../profile/components/ProfileSecuritySubPageFrame';
 import { cn } from '../../../lib/cn';
@@ -77,8 +78,9 @@ export function SessionsPage() {
       );
       return unwrap<{ message: string }>(body);
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       qc.invalidateQueries({ queryKey: ['sessions'] });
+      await notifySuccess('Otras sesiones cerradas');
     },
   });
 
@@ -122,9 +124,16 @@ export function SessionsPage() {
         <button
           type="button"
           onClick={() => {
-            if (window.confirm('¿Cerrar el resto de dispositivos? El navegador actual seguirá conectado.')) {
-              revokeOthers.mutate();
-            }
+            void (async () => {
+              const ok = await confirmAction({
+                title: 'Cerrar otras sesiones',
+                text: 'Se cerrarán los otros dispositivos. El navegador actual seguirá conectado.',
+                confirmText: 'Sí, cerrar',
+                cancelText: 'Cancelar',
+                icon: 'warning',
+              });
+              if (ok) revokeOthers.mutate();
+            })();
           }}
           disabled={revokeOthers.isPending || othersActive === 0}
           className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-zinc-200/80 bg-white px-3.5 py-2 text-[12px] font-semibold text-zinc-800 shadow-sm transition hover:border-amber-400/50 hover:bg-amber-50/50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-zinc-900/60 dark:text-zinc-200 dark:hover:border-amber-500/30 dark:hover:bg-amber-500/10"

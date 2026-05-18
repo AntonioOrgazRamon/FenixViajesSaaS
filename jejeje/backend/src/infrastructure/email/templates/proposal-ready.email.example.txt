@@ -1,0 +1,44 @@
+Ejemplo de correo operativo "propuesta lista" (texto plano generado por buildProposalReadyEmail)
+
+--------------------------------------------------------------------------------
+Asunto: Propuesta lista para revisar — María Gómez — CRM
+
+Hola Ana,
+
+Propuesta comercial lista para el cliente «María Gómez».
+
+Contacto del cliente:
+• Email: maria@ejemplo.com
+• Teléfono: +34 600 000 000
+• Organización: Viajes del Sur S.L.
+
+Destino / intención principal:
+Japón · circuito cultura y gastronomía
+
+Duración / presupuesto orientativos:
+12 días · desde 3290 EUR
+
+Intención detectada (detalle):
+Interés activo en viaje a Japón
+Señales: Destino detectado: Japón · Fecha o referencia temporal en el lead
+
+Opciones recomendadas (orden por encaje):
+• 1. Japón esencial — Tokio, Kioto — (3290 EUR)
+• 2. Corea y Japón express — Seúl, Tokio — (2890 EUR)
+• 3. Japón premium onsen — Hakone — (4290 EUR)
+
+Ficha del lead:
+https://app.ejemplo.com/leads/550e8400-e29b-41d4-a716-446655440000
+
+Ver propuesta en la app:
+https://app.ejemplo.com/leads/550e8400-e29b-41d4-a716-446655440000#propuesta
+
+PDF / descarga:
+https://api.ejemplo.com/uploads/proposals/empresa-uuid/version-uuid.pdf
+
+— CRM
+--------------------------------------------------------------------------------
+
+Notas:
+- Los enlaces usan FRONTEND_BASE_URL y PUBLIC_URL según .env.
+- Si falla SMTP, el flujo de generación sigue; queda LeadActivity SELLER_NOTIFIED con el error.

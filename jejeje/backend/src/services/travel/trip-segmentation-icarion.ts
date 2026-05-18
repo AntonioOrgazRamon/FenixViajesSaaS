@@ -106,6 +106,9 @@ export function countTripSignals(text: string): { total: number; flags: string[]
 }
 
 const DE_LUJO = /\b[A-ZÁÉÍÚÑ0-9\s,]{4,50}DE\s+LUJO\b/i;
+/** Títulos multi-destino / rutas sin “DE LUJO” (catálogos Asia-Pacífico, etc.). */
+const GEO_CATALOG_TITLE =
+  /\b(?:E|Y)\s+(?:ICONOS?|ISLAS?|ENCANTOS?|RUTAS?|COSTAS?|LITORAL|ALTA\s+GAMA)\b|\bCON\s+(?:JAPAN\s+)?RAIL\s+PASS\b|\bRUTA\s+\d+\b|\bJAP[ÓO]N\s+CON\b|\bMALASIA\b|\bSINGAP(?:UR|ORE)\b|\bBORNEO\b|\bR(?:ÍI)O\s+DE\s+LUJO\b/i;
 /** Títulos de producto (estricto). Evita coincidir solo "VIETNAM" en cuerpo de hoteles. */
 const NARROW_CATALOG_TITLES =
   /ENCANTOS?\s+DE|VIETNAM\s+SORPRENDENTE(?:\s+CON\s+SAPA)?|JAP[ÓO]N\s+DE|MARAVILLAS\s+DE|ICONOS\s+DE|NATURALEZA\s+DE|LUXURY\s+VIETNAM|VIETNAM\s+Y\s+CAMBOYA|VIETNAM\s+CON\s+SAPA|ENCANTOS\s+DE/i;
@@ -118,6 +121,7 @@ export function hasRealTripTitleNarrow(t: string): boolean {
   const h = t.slice(0, TITLE_SCAN);
   if (DE_LUJO.test(h)) return true;
   if (NARROW_CATALOG_TITLES.test(h)) return true;
+  if (GEO_CATALOG_TITLE.test(h)) return true;
   if (
     /CARIBE\s+MEXICANO|REP[ÚU]BLICA\s+DOMINICANA|PUERTO\s+RICO/i.test(h) &&
     /DE\s+LUJO|ENCANTOS/i.test(h)
@@ -302,7 +306,7 @@ export function extractTitleLineCandidate(text: string): string | null {
 export function isValidProductTitle(s: string | null | undefined): boolean {
   if (s == null) return false;
   const t = s.replace(/\s+/g, ' ').trim();
-  if (t.length < 4 || t.length > 80) return false;
+  if (t.length < 4 || t.length > 120) return false;
   if (/20\d{2}\s*\/\s*20?\d{2,4}/.test(t) || /2025\/26|2026\/27/i.test(t)) return false;
   if (/^D[ÍI]A\s/i.test(t) || (t.length < 50 && /D[ÍI]A\s*1|D[ÍI]A\s*7/i.test(t))) return false;
   if (NARRATIVE_TITLE_VERB.test(t)) return false;
@@ -319,9 +323,30 @@ export function isValidProductTitle(s: string | null | undefined): boolean {
 
 function looksNarrativeTitle(t: string): boolean {
   if (NARRATIVE_TITLE_VERB.test(t)) return true;
+  if (/\b(SEGUIREMOS|VISITAREMOS|VEREMOS|PODR[EÉ]MOS|MARAVILLOS[OA]S?|FOTOGRAFI|PODER\s+FOTO|PASEAREMOS|DESCUBRIREMOS)\b/i.test(t)) {
+    return true;
+  }
   if (/[.;:!?]/.test(t) && t.length > 18) return true;
   const w = t.split(/\s+/).filter(Boolean);
   if (w.length < 2 || w.length > 12) return true;
+  return false;
+}
+
+/** Línea tipo “Singapur e iconos de Malasia” (topónimos + conectores; sin verbos de guía). */
+export function isLikelyGeographicCatalogTitleLine(line: string): boolean {
+  const t = line.replace(/\s+/g, ' ').trim();
+  if (t.length < 10 || t.length > 95) return false;
+  if (isNoiseTitleLine(t) || isBlockedFirstLineOrTitle(t)) return false;
+  if (looksNarrativeTitle(t)) return false;
+  if (NARRATIVE_TITLE_VERB.test(t)) return false;
+  const letters = t.replace(/[^a-záéíóúñA-ZÁÉÍÓÚÑ]/g, '');
+  if (letters.length < 8) return false;
+  const upperish = (t.match(/\b[A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑa-záéíóúñ]{2,}\b/g) ?? []).length;
+  const words = t.split(/\s+/).filter(Boolean);
+  if (words.length < 3 || words.length > 14) return false;
+  const hasConnector = /\b(DE|DEL|LA|LAS|LOS|E|Y|CON)\b/i.test(t);
+  if (upperish >= 2 && hasConnector) return true;
+  if (GEO_CATALOG_TITLE.test(t) || NARROW_CATALOG_TITLES.test(t) || DE_LUJO.test(t)) return true;
   return false;
 }
 
@@ -548,6 +573,9 @@ export function extractTripTitle(text: string): string | null {
   for (const line of lines) {
     if (line.length < 10 || line.length > 200) continue;
     if (isNoiseTitleLine(line) || isBlockedFirstLineOrTitle(line)) continue;
+    if (isLikelyGeographicCatalogTitleLine(line)) {
+      return line.toUpperCase().replace(/\s+/g, ' ').trim();
+    }
     const letters = line.replace(/[^a-záéíóúñA-ZÁÉÍÓÚÑ]/g, '');
     const up = letters.split('').filter((c) => c === c.toUpperCase()).length;
     if (letters.length < 6) continue;
@@ -855,14 +883,21 @@ export function buildIcarionSegments(
         }
         if (!sameSegmentTitle(altC, current.title)) {
           log(n, {
-            kind: 'ORPHAN_IGNORED',
-            motivo:
-              'Bloque tipo ficha y título distinto: no anexar como TRIP_CONTINUATION (nuevo producto o revisar corte arriba)',
+            kind: 'TRIP_START',
+            motivo: 'Nueva ficha con otro título: cierre de segmento y apertura (evita MIXED_SEGMENT)',
             asociadaA: current.title,
-            action: 'skip_orphan_not_merged',
+            action: 'close_open_distinct_fiche_title',
             titleCandidate: altC,
+            titulo: altC,
             signals: formatSignalsForLog(t),
           });
+          pushCurrent();
+          current = {
+            title: altC,
+            textParts: [`--- Pág. real ${n} (TRIP_START) ---\n${t}`],
+            pageStart: n,
+            pageEnd: n,
+          };
           continue;
         }
       }

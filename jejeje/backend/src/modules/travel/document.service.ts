@@ -11,6 +11,16 @@ const importService = new TripImportService();
 const allowedMime = 'application/pdf';
 const TRAVEL_MIN_UPLOAD_MB = 130;
 
+function assertPdfMagicBuffer(buf: Buffer) {
+  if (buf.length < 5) {
+    throw new ValidationError('PDF no válido');
+  }
+  const sig = buf.subarray(0, 5).toString('latin1');
+  if (!sig.startsWith('%PDF-')) {
+    throw new ValidationError('El archivo no es un PDF válido (contenido no coincide con firma PDF)');
+  }
+}
+
 export class TravelDocumentService {
   maxMb(): number {
     const configured = parseFloat(config.TRAVEL_PDF_MAX_MB || '150');
@@ -42,6 +52,8 @@ export class TravelDocumentService {
         `El PDF supera el tamaño máximo (${this.maxMb()} MB)`,
       );
     }
+
+    assertPdfMagicBuffer(input.buffer);
 
     const id = uuidv4();
     const ext = path.extname(input.originalName) || '.pdf';

@@ -6,10 +6,15 @@ import { useAuthStore, type AuthUser } from '../store/authStore';
 export function AuthBootstrap({ children }: { children: React.ReactNode }) {
   const token = useAuthStore((s) => s.token);
   const setUser = useAuthStore((s) => s.setUser);
+  const setBootstrapping = useAuthStore((s) => s.setBootstrapping);
   const logout = useAuthStore((s) => s.logout);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token) {
+      setBootstrapping(false);
+      return;
+    }
+    setBootstrapping(true);
     let cancelled = false;
     (async () => {
       try {
@@ -17,12 +22,14 @@ export function AuthBootstrap({ children }: { children: React.ReactNode }) {
         if (!cancelled) setUser(unwrap(data));
       } catch {
         if (!cancelled) logout();
+      } finally {
+        if (!cancelled) setBootstrapping(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [token, setUser, logout]);
+  }, [token, setUser, setBootstrapping, logout]);
 
   return <>{children}</>;
 }

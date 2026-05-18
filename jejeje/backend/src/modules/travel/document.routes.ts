@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { requireAuth } from '../../common/middlewares/auth';
+import { openaiSensitiveIpLimiter } from '../../common/middlewares/openai-sensitive-limiter';
 import { TravelDocumentController } from './document.controller';
 import { config } from '../../common/config';
 
@@ -23,6 +24,6 @@ router.post('/clear', c.clearAll.bind(c));
 router.get('/jobs/:jobId', c.jobStatus.bind(c));
 router.delete('/:id', c.remove.bind(c));
 router.get('/:id', c.getOne.bind(c));
-router.post('/:id/process', c.process.bind(c));
+router.post('/:id/process', openaiSensitiveIpLimiter, c.process.bind(c));
 
 export default router;

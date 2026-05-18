@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<!--
+  Ejemplo estático de salida del generador de propuestas (ProposalGenerationService + renderTravelProposalHtml).
+  Los datos son ficticios; la estructura y clases coinciden con la plantilla determinística en producción.
+  Ver: backend/src/services/proposals/proposal-html-template.ts
+-->
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ejemplo — Propuesta de viaje — Viajes Demo SA</title>
+  <style>
+    :root {
+      --ink: #0f172a;
+      --muted: #475569;
+      --line: #e2e8f0;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --accent: #0ea5e9;
+      --accent2: #0369a1;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.55;
+      font-size: 15px;
+    }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 28px 20px 48px; }
+    header.doc {
+      background: linear-gradient(120deg, var(--accent2), var(--accent));
+      color: #fff;
+      padding: 28px 24px;
+      border-radius: 14px;
+      box-shadow: 0 12px 40px rgba(14, 165, 233, 0.25);
+    }
+    header.doc h1 { margin: 0 0 8px; font-size: 26px; letter-spacing: -0.02em; }
+    header.doc .meta { opacity: 0.92; font-size: 14px; }
+    .company { font-weight: 600; margin-top: 10px; font-size: 15px; }
+    .company-meta { margin-top: 8px; font-size: 13px; opacity: 0.92; line-height: 1.4; }
+    section.block {
+      margin-top: 22px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px 20px;
+    }
+    section.block h2 {
+      margin: 0 0 12px;
+      font-size: 17px;
+      letter-spacing: -0.01em;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 10px;
+    }
+    .muted { color: var(--muted); margin: 0; }
+    .grid-3 {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      margin-top: 8px;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px 16px 16px;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      min-height: 100%;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 999px;
+      color: #fff;
+    }
+    .badge-rec { background: #047857; }
+    .badge-eco { background: #2563eb; }
+    .badge-prem { background: #7c3aed; }
+    .card-head h3 { margin: 8px 0 4px; font-size: 17px; line-height: 1.25; }
+    .card-head .sub { margin: 0; color: var(--muted); font-size: 14px; }
+    dl.facts {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 12px;
+      margin: 12px 0 0;
+      font-size: 13px;
+    }
+    dl.facts dt { color: var(--muted); font-weight: 600; }
+    dl.facts dd { margin: 0; }
+    .hl-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 12px 0 6px; }
+    .hl { margin: 0; padding-left: 18px; font-size: 13px; color: #334155; }
+    .card-foot { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+    .pitch { margin: 0 0 12px; font-size: 13px; line-height: 1.45; color: #1e293b; }
+    .pitch-label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--accent2);
+      margin-bottom: 4px;
+    }
+    .mini-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media (max-width: 520px) { .mini-two-col { grid-template-columns: 1fr; } }
+    .mini-panel { background: #f1f5f9; border-radius: 8px; padding: 10px 12px; font-size: 12px; }
+    .mini-title { margin: 0 0 6px; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+    footer.note { margin-top: 28px; font-size: 12px; color: var(--muted); text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="doc">
+      <h1>Propuesta de viaje — Viajes Demo SA</h1>
+      <div class="meta">Generado el 18 de mayo de 2026, 14:30</div>
+      <div class="company">Viajes Demo SA</div>
+      <div class="company-meta"><div>Identificador de empresa: viajes-demo</div></div>
+    </header>
+
+    <section class="block">
+      <h2>Datos del cliente</h2>
+      <ul>
+        <li>Ana García López</li>
+        <li>Email: ana.ejemplo@correo.test</li>
+        <li>Teléfono: +34 600 000 000</li>
+        <li>País: España</li>
+      </ul>
+    </section>
+
+    <section class="block">
+      <h2>Qué está buscando (resumen)</h2>
+      <ul>
+        <li>Destino deseado: Vietnam</li>
+        <li>Duración orientativa: 12 días</li>
+        <li>Presupuesto orientativo por persona: 2800 (moneda según catálogo)</li>
+        <li>Viajeros: 2</li>
+        <li>Preferencias: vuelos con pocas escalas; hoteles boutique en ciudad</li>
+      </ul>
+    </section>
+
+    <section class="block intro">
+      <p>Propuesta de ejemplo: tres alternativas del catálogo con scoring transparente. Texto introductorio puede ser asistido por IA; la maquetación y datos numéricos son fijos.</p>
+    </section>
+
+    <section class="block">
+      <h2>Opciones presentadas</h2>
+      <p class="muted">En cada tarjeta: destacados del catálogo, motivo comercial (ángulo del scorer), coincidencias y diferencias respecto a la intención.</p>
+      <div class="grid-3">
+
+        <article class="card">
+          <div class="card-head">
+            <span class="badge badge-rec">Opción recomendada</span>
+            <h3>Vietnam esencial — 12 días</h3>
+            <p class="sub">Temporada otoño · Circuito cultural Hanoi, Hue, Hoi An</p>
+          </div>
+          <dl class="facts">
+            <div><dt>Destino</dt><dd>Vietnam</dd></div>
+            <div><dt>Duración</dt><dd>12 días</dd></div>
+            <div><dt>Precio orientativo</dt><dd>2.650 EUR</dd></div>
+            <div><dt>Scoring</dt><dd>82/100 · Destino 27/30 · Duración 18/20 · Presupuesto 18/20</dd></div>
+          </dl>
+          <p class="hl-title">Destacados del catálogo</p>
+          <ul class="hl">
+            <li>Vuelos internacionales incluidos</li>
+            <li>Traslados privados en ciudad</li>
+            <li>4 noches en Hoi An</li>
+          </ul>
+          <div class="card-foot">
+            <p class="pitch"><span class="pitch-label">Motivo comercial</span> Buen encaje por destino y duración; precio dentro de presupuesto. Reforzar valor de boutique en Hoi An.</p>
+            <div class="mini-two-col">
+              <div class="mini-panel">
+                <p class="mini-title">Coincidencias con lo buscado</p>
+                <ul>
+                  <li>Destino muy alineado con la búsqueda</li>
+                  <li>Duración encaja bien con lo solicitado</li>
+                  <li>Precio orientativo compatible con el presupuesto</li>
+                </ul>
+              </div>
+              <div class="mini-panel">
+                <p class="mini-title">Diferencias / a revisar</p>
+                <ul>
+                  <li>No hay salida clara para el mes indicado</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-head">
+            <span class="badge badge-eco">Opción más económica</span>
+            <h3>Vietnam clásico — 11 días</h3>
+            <p class="sub">Circuito grupal reducido · Hoteles 4*</p>
+          </div>
+          <dl class="facts">
+            <div><dt>Destino</dt><dd>Vietnam</dd></div>
+            <div><dt>Duración</dt><dd>11 días</dd></div>
+            <div><dt>Precio orientativo</dt><dd>2.190 EUR</dd></div>
+            <div><dt>Scoring</dt><dd>71/100 · …</dd></div>
+          </dl>
+          <p class="hl-title">Destacados del catálogo</p>
+          <ul class="hl"><li>Visitas guiadas en español</li><li>Media pensión según programa</li></ul>
+          <div class="card-foot">
+            <p class="pitch"><span class="pitch-label">Motivo comercial</span> Argumentario precio para cliente sensible al coste; aclarar grupo vs privado.</p>
+            <div class="mini-two-col">
+              <div class="mini-panel">
+                <p class="mini-title">Coincidencias con lo buscado</p>
+                <ul><li>Destino razonablemente cercano a la intención</li></ul>
+              </div>
+              <div class="mini-panel">
+                <p class="mini-title">Diferencias / a revisar</p>
+                <ul>
+                  <li>La duración del catálogo se aleja de lo buscado o no está definida</li>
+                  <li>Pocas coincidencias textuales con tipo/preferencias</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-head">
+            <span class="badge badge-prem">Opción premium / completa</span>
+            <h3>Vietnam exclusivo — 13 días</h3>
+            <p class="sub">Hoteles boutique · crucero Halong premium</p>
+          </div>
+          <dl class="facts">
+            <div><dt>Destino</dt><dd>Vietnam</dd></div>
+            <div><dt>Duración</dt><dd>13 días</dd></div>
+            <div><dt>Precio orientativo</dt><dd>3.450 EUR</dd></div>
+            <div><dt>Scoring</dt><dd>68/100 · …</dd></div>
+          </dl>
+          <p class="hl-title">Destacados del catálogo</p>
+          <ul class="hl"><li>Halong 2N en junk boutique</li><li>Traslados premium</li></ul>
+          <div class="card-foot">
+            <p class="pitch"><span class="pitch-label">Motivo comercial</span> Upsell por preferencias boutique y margen; validar presupuesto máximo.</p>
+            <div class="mini-two-col">
+              <div class="mini-panel">
+                <p class="mini-title">Coincidencias con lo buscado</p>
+                <ul><li>El contenido del viaje refleja tipo o preferencias</li></ul>
+              </div>
+              <div class="mini-panel">
+                <p class="mini-title">Diferencias / a revisar</p>
+                <ul><li>Precio orientativo por encima del presupuesto o no informado</li></ul>
+              </div>
+            </div>
+          </div>
+        </article>
+
+      </div>
+    </section>
+
+    <section class="block">
+      <h2>Motivos de la recomendación (visión general)</h2>
+      <p class="muted">Resumen transversal (la comparativa detallada está en cada tarjeta de opción).</p>
+      <ul>
+        <li>La opción recomendada maximiza encaje destino + duración + presupuesto.</li>
+        <li>Alternativa económica para negociación o segunda línea.</li>
+        <li>Premium si el cliente flexibiliza presupuesto por experiencia.</li>
+      </ul>
+    </section>
+
+    <section class="block">
+      <h2>Siguiente paso para el vendedor</h2>
+      <p>Confirmar con el cliente la opción preferida; registrar en CRM y solicitar disponibilidad formal antes de cotización cerrada.</p>
+    </section>
+
+    <footer class="note">
+      Documento de ejemplo. Precios y disponibilidad orientativos.
+    </footer>
+  </div>
+</body>
+</html>

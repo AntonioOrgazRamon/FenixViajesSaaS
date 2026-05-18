@@ -95,7 +95,7 @@ export const apiDocs = {
         roles: ["SUPER_ADMIN"],
         body: {
           company: { name: "string", slug: "string" },
-          initialAdmin: { email: "string", firstName: "string", lastName: "string", password: "string", phone: "string (opcional)" }
+          initialAdmin: { email: "string", firstName: "string", lastName: "string", password: "string (misma política que reset: 8+ chars, mayúsc, minúsc, dígito, símbolo)", phone: "string (opcional)" }
         }
       },
       {
@@ -203,6 +203,132 @@ export const apiDocs = {
         description: "Marca un viaje como aprobado para búsqueda y propuestas.",
         authRequired: true,
         roles: ["COMPANY_ADMIN", "SUPER_ADMIN"]
+      },
+      {
+        method: "POST",
+        path: "/api/v1/travel/import-json/upload",
+        description:
+          "Staging: sube .json con array de ítems en formato enriquecido `{ source, trip, metadata }` (u objeto único). Planos legados se convierten automáticamente. SUPER_ADMIN: query/body `companyId`.",
+        authRequired: true,
+        roles: ["COMPANY_ADMIN", "SUPER_ADMIN"]
+      },
+      {
+        method: "POST",
+        path: "/api/v1/travel/import-json/paste",
+        description:
+          "Igual que upload con JSON en body (`jsonContent` string). Formato oficial por ítem: `{ source, trip, metadata }`. Planos legados compatibles. `companyId` obligatorio si SUPER_ADMIN.",
+        authRequired: true,
+        roles: ["COMPANY_ADMIN", "SUPER_ADMIN"],
+        body: {
+          jsonContent: "string (requerido)",
+          fileName: "string (opcional)",
+          companyId: "uuid (SUPER_ADMIN requerido)"
+        }
+      },
+      {
+        method: "GET",
+        path: "/api/v1/travel/import-json/batches",
+        description: "Lista lotes JSON por empresa (paginado). SUPER_ADMIN: `companyId` query.",
+        authRequired: true,
+        roles: ["COMPANY_ADMIN", "SUPER_ADMIN"]
+      },
+      {
+        method: "GET",
+        path: "/api/v1/travel/import-json/batches/:batchId",
+        description: "Detalle de lote con ítems. SUPER_ADMIN: `companyId` query.",
+        authRequired: true,
+        roles: ["COMPANY_ADMIN", "SUPER_ADMIN"]
+      },
+      {
+        method: "PATCH",
+        path: "/api/v1/travel/import-json/items/:itemId",
+        description:
+          "Fusiona parche en `normalizedJson` (contrato enriquecido): preferible `{ trip: { ... } }`; también se fusionan claves del viaje en raíz si coinciden con `trip`. Revalida. SUPER_ADMIN: body/query `companyId`.",
+        authRequired: true,
+        roles: ["COMPANY_ADMIN", "SUPER_ADMIN"]
+      },
+      {
+        method: "POST",
+        path: "/api/v1/travel/import-json/batches/:batchId/import",
+        description:
+          "Importa ítems VALID/WARNING a BD (TravelTrip + destinos + geo). Omite INVALID y slugs duplicados por tenant.",
+        authRequired: true,
+        roles: ["COMPANY_ADMIN", "SUPER_ADMIN"]
+      },
+      {
+        method: "DELETE",
+        path: "/api/v1/travel/import-json/batches/:batchId",
+        description: "Elimina lote staging si aún no está IMPORTED. SUPER_ADMIN: `companyId` query.",
+        authRequired: true,
+        roles: ["COMPANY_ADMIN", "SUPER_ADMIN"]
+      }
+    ],
+    proposals: [
+      {
+        method: "POST",
+        path: "/api/v1/proposals/:leadId/generate",
+        description:
+          "Genera HTML responsive + PDF para el lead: usa TravelSearchService + motor rec-engine (catálogo APPROVED), slots recomendada/presupuesto/premium/alternativa con scoring determinista y trazas, persiste ProposalVersion + ProposalTrip + artefacto PDF y registra LeadActivity. Body opcional: intentSnapshot, trips[], useAiCopy.",
+        authRequired: true,
+        roles: ["COMPANY_ADMIN", "COMPANY_USER"],
+        body: {
+          intentSnapshot: "object (opcional, fusionado con contexto del lead)",
+          trips: "array opcional de { travelTripId, score?, reasons? }",
+          useAiCopy: "boolean (opcional; requiere OPENAI_API_KEY)"
+        }
+      },
+      {
+        method: "GET",
+        path: "/api/v1/proposals/:proposalId",
+        description: "Devuelve la propuesta con la última versión (HTML, trips enlazados, artefactos). Aislamiento por empresa.",
+        authRequired: true,
+        roles: ["COMPANY_ADMIN", "COMPANY_USER"]
+      },
+      {
+        method: "GET",
+        path: "/api/v1/proposals/:proposalId/pdf",
+        description: "Descarga el PDF de la última versión (si existe).",
+        authRequired: true,
+        roles: ["COMPANY_ADMIN", "COMPANY_USER"]
+      }
+    ],
+    openaiAdmin: [
+      {
+        method: "GET",
+        path: "/api/v1/admin/openai/usage",
+        description:
+          "Historial de uso OpenAI (logs con coste estimado, tokens, bloqueos). Query: companyId?, status?, take, skip, since.",
+        authRequired: true,
+        roles: ["SUPER_ADMIN"]
+      },
+      {
+        method: "GET",
+        path: "/api/v1/admin/openai/budget",
+        description: "Presupuesto/flags en BD para una empresa. Query: companyId (UUID).",
+        authRequired: true,
+        roles: ["SUPER_ADMIN"]
+      },
+      {
+        method: "PATCH",
+        path: "/api/v1/admin/openai/budget",
+        description:
+          "Crea/actualiza límites por tenant (hardBlock, topes €, llamadas/hora, tokens/request). Body incluye companyId.",
+        authRequired: true,
+        roles: ["SUPER_ADMIN"]
+      },
+      {
+        method: "POST",
+        path: "/api/v1/admin/openai/kill-switch",
+        description: "Activa/desactiva kill switch global en BD (sumado al OPENAI_GLOBAL_KILL_SWITCH de env). Body: { active: boolean }. ",
+        authRequired: true,
+        roles: ["SUPER_ADMIN"]
+      },
+      {
+        method: "GET",
+        path: "/api/v1/admin/openai/alerts",
+        description: "Últimos eventos BLOCKED/ERROR + estado sistema + resumen env.",
+        authRequired: true,
+        roles: ["SUPER_ADMIN"]
       }
     ]
   }

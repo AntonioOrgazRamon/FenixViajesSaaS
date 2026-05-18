@@ -302,8 +302,8 @@ export function rejectHotelCandidate(candidate: string): string | null {
   if (TRIV_DE_LUJO.test(t) && !RE_HOTEL_TRUST.test(t)) {
     return 'título de viaje (De Lujo), no alojamiento';
   }
-  if (/\b(La posibilidad|Lujo se mezclan|Excelente en esta|Desde los recuerdos|de las escasas)\b/i.test(t)) {
-    return 'fragmento narrativo';
+  if (/\b(poder|fotografiar|desde el exterior|placer al sol|estancia un|maravillos[ao]s?\s+fotos)\b/i.test(t)) {
+    return 'narración / experiencia (no hotel)';
   }
   if (/\b(Alojamiento en (el|los) hotel|hotel seleccionado|según disponibilidad)\b/i.test(t)) {
     return 'texto genérico alojamiento';
@@ -771,6 +771,51 @@ const SOURCE_RANK: Record<HotelSource, number> = {
 };
 
 /**
+ * Si existe "Punta Cana Iberostar Foo" y "Iberostar Foo", conserva fila con ciudad separada.
+ */
+function collapseCityPrefixedHotelDupes(list: HotelCandidate[], sink: RejectedCandidate[]): HotelCandidate[] {
+  const consumed = new Set<number>();
+  const result: HotelCandidate[] = [];
+  for (let i = 0; i < list.length; i++) {
+    if (consumed.has(i)) continue;
+    const a = list[i]!;
+    if (a.city) {
+      result.push(a);
+      continue;
+    }
+    const al = a.hotelName.toLowerCase();
+    let merged: HotelCandidate | null = null;
+    for (let j = 0; j < list.length; j++) {
+      if (i === j || consumed.has(j)) continue;
+      const b = list[j]!;
+      if (b.city) continue;
+      const bl = b.hotelName.toLowerCase();
+      if (al.length > bl.length + 4 && al.endsWith(` ${bl}`)) {
+        const prefix = a.hotelName.slice(0, a.hotelName.length - b.hotelName.length).trim();
+        const nTok = prefix.split(/\s+/).length;
+        if (nTok >= 1 && nTok <= 3 && !rejectHotelCandidate(b.hotelName)) {
+          merged = {
+            ...b,
+            city: prefix,
+            hotelName: normalizeHotelName(b.hotelName),
+            source: SOURCE_RANK[a.source] >= SOURCE_RANK[b.source] ? a.source : b.source,
+            confidence: Math.max(a.confidence, b.confidence),
+            category: b.category ?? a.category,
+            normKey: normKey(`${prefix} ${b.hotelName} ${b.category ?? a.category ?? ''}`),
+          };
+          consumed.add(i);
+          consumed.add(j);
+          sink.push({ value: a.hotelName, reason: 'duplicado ciudad+hotel colapsado' });
+          break;
+        }
+      }
+    }
+    result.push(merged ?? a);
+  }
+  return result;
+}
+
+/**
  * Deduplicación: preferir origen, luego nombre más largo; quitar subcadenas
  */
 export function dedupeHotels(
@@ -803,7 +848,23 @@ export function dedupeHotels(
       sink.push({ value: h.hotelName, reason: 'duplicado' });
     }
   }
-  const list0 = Array.from(by.values());
+  let list0 = Array.from(by.values());
+  list0 = collapseCityPrefixedHotelDupes(list0, sink);
+  list0 = list0.filter((h) => {
+    const richer = list0.some(
+      (x) =>
+        x !== h &&
+        normKey(x.hotelName) === normKey(h.hotelName) &&
+        normKey(x.category ?? '') === normKey(h.category ?? '') &&
+        !!x.city &&
+        !h.city,
+    );
+    if (richer) {
+      sink.push({ value: h.hotelName, reason: 'duplicado sin ciudad (se conserva versión con ciudad)' });
+      return false;
+    }
+    return true;
+  });
   return list0.filter((h) => {
     const sub = list0.some(
       (x) =>
@@ -829,6 +890,14 @@ function hasExplicitHotelFraming(n: string): boolean {
   );
 }
 
+function looksWeakHotelName(n: string): boolean {
+  const t = n.replace(/\s+/g, ' ').trim();
+  if (/^(Hotel|Resort|Beach|Suites?|Villas?|Spa|Boutique|Central|Best Western)$/i.test(t)) {
+    return true;
+  }
+  return false;
+}
+
 export type FilterHotelsForPersistenceOptions = {
   /** normKey de hoteles detectados solo en tabla / títulos visuales del bloque estructurado (no destino fijo). */
   visualWhitelistNormKeys?: Set<string>;
@@ -849,8 +918,8 @@ export function finalHotelPersistenceBarrier(
   const n = normalizeHotelName(raw);
   const k = normKey(n);
 
-  if (/\bnoches?\s+a\s+bordo\b/i.test(n)) {
-    return 'itinerario (noche a bordo)';
+  if (/\b(poder|fotografiar|desde el exterior|placer|maravillos[ao]s?\s+vistas?)\b/i.test(n) && !RE_STRONG_HOTEL_KEYWORD.test(n)) {
+    return 'frase de experiencia / verbo (no nombre de alojamiento)';
   }
   if (/bah[ií]as?\s+bioluminiscentes?\b/i.test(n)) {
     return 'excursión / naturaleza (bioluminiscentes)';
@@ -869,6 +938,12 @@ export function finalHotelPersistenceBarrier(
   }
   if (/\bsalidas\b/i.test(n) && twords(n) < 10) {
     return 'rúbrica o texto de salidas';
+  }
+  if (/^(pasear|descubrir|embarque|visitar|disfrutar|conocer|experimentar)\b/i.test(n)) {
+    return 'frase narrativa (inicio verbal)';
+  }
+  if (looksWeakHotelName(n)) {
+    return 'nombre de hotel débil/incompleto';
   }
 
   if (/\.\s*$/.test(n) && twords(n) <= 10 && !RE_STRONG_HOTEL_KEYWORD.test(n)) {

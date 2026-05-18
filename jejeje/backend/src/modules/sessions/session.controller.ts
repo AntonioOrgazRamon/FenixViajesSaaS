@@ -35,7 +35,13 @@ export class SessionController {
     const parsed = revokeSessionSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError(parsed.error.issues[0].message);
 
-    const result = await sessionService.revokeUserSessions(req.params.userId as string, req.user!.id, parsed.data.reason);
+    const result = await sessionService.revokeUserSessions(
+      req.params.userId as string,
+      req.user!.id,
+      req.user!.role,
+      req.user!.companyId ?? null,
+      parsed.data.reason
+    );
     res.json({ success: true, data: result });
   }
 }

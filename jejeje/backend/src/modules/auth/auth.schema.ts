@@ -12,6 +12,10 @@ export const refreshSchema = z.object({
   refreshToken: z.string(),
 });
 
+export const googleExchangeSchema = z.object({
+  code: z.string().min(1),
+});
+
 export const changePasswordSchema = z.object({
   currentPassword: z.string(),
   newPassword: z.string().min(10),

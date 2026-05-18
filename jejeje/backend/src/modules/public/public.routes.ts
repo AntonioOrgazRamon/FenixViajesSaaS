@@ -17,5 +17,6 @@ const intakeRateLimiter = rateLimit({
 const publicLead = new PublicLeadController();
 
 router.post('/leads/intake', intakeRateLimiter, publicLead.intake.bind(publicLead));
+router.post('/leads/form', intakeRateLimiter, publicLead.form.bind(publicLead));
 
 export default router;

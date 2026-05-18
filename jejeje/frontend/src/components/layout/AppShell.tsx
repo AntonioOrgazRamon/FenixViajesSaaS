@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
+  Activity,
   Building2,
   ClipboardList,
   FileText,
@@ -8,8 +9,12 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Radar,
+  Search,
   Shield,
+  Sparkles,
   Target,
+  Upload,
   UserCircle,
   UserPlus,
   Users,
@@ -20,6 +25,7 @@ import { api } from '../../lib/axios';
 import { useAuthStore, type AppRole } from '../../store/authStore';
 import { UserAvatarView } from '../../lib/userAvatarView';
 import { SidebarThemeToggle } from './SidebarThemeToggle';
+import { CommandPalette } from './CommandPalette';
 
 function roleLabel(role: AppRole | undefined): string {
   if (role === 'SUPER_ADMIN') return 'Super admin';
@@ -31,7 +37,7 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   cn(
     'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-colors',
     isActive
-      ? 'bg-amber-500/15 text-amber-900 shadow-sm dark:bg-amber-500/[0.12] dark:text-amber-50 dark:shadow-none'
+      ? 'bg-cyan-500/[0.12] text-cyan-950 shadow-sm dark:bg-cyan-500/[0.14] dark:text-cyan-50 dark:shadow-none'
       : 'text-zinc-600 hover:bg-zinc-100/90 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/[0.05] dark:hover:text-zinc-100',
   );
 
@@ -44,9 +50,9 @@ const subNavClass = ({ isActive }: { isActive: boolean }) =>
   );
 
 const shellAside =
-  'flex w-[17rem] shrink-0 flex-col border-r backdrop-blur-xl ' +
+  'flex w-[15.5rem] shrink-0 flex-col border-r backdrop-blur-xl ' +
   'border-zinc-200/90 bg-white/95 ' +
-  'dark:border-zinc-800/90 dark:bg-zinc-950/[0.97]';
+  'dark:border-zinc-800/90 dark:bg-[#0c0d10]/[0.98]';
 
 export function AppShell() {
   const user = useAuthStore((s) => s.user);
@@ -94,17 +100,21 @@ export function AppShell() {
   };
 
   const superLinks: { to: string; label: string; icon: typeof LayoutDashboard }[] = [
-    { to: '/superadmin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { to: '/superadmin/dashboard', label: 'Inicio', icon: LayoutDashboard },
     { to: '/superadmin/tenants', label: 'Empresas', icon: Building2 },
     { to: '/superadmin/users', label: 'Usuarios', icon: Users },
     { to: '/superadmin/travel', label: 'Catálogo (PDF)', icon: FileText },
+    { to: '/travel/import', label: 'Import JSON', icon: Upload },
     { to: '/superadmin/audit-logs', label: 'Auditoría', icon: ClipboardList },
   ];
 
   const adminLinks: { to: string; label: string; icon: typeof LayoutDashboard }[] = [
-    { to: '/app/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { to: '/app/dashboard', label: 'Inicio', icon: LayoutDashboard },
     { to: '/leads', label: 'Leads', icon: Target },
+    { to: '/app/motor', label: 'Motor', icon: Radar },
+    { to: '/app/ia', label: 'IA & costes', icon: Activity },
     { to: '/app/travel', label: 'Catálogo (PDF)', icon: FileText },
+    { to: '/travel/import', label: 'Import JSON', icon: Upload },
     { to: '/app/users', label: 'Usuarios', icon: Users },
     { to: '/app/users/new', label: 'Nuevo usuario', icon: UserPlus },
     { to: '/app/admins/new', label: 'Nuevo admin', icon: Shield },
@@ -126,13 +136,18 @@ export function AppShell() {
     return [
       { to: '/app/home', label: 'Inicio', icon: Home },
       { to: '/leads', label: 'Leads', icon: Target },
-      { to: '/app/users', label: 'Usuarios', icon: Users },
+      { to: '/app/motor', label: 'Motor', icon: Radar },
+      { to: '/app/users', label: 'Equipo', icon: Users },
     ] as { to: string; label: string; icon: typeof Home }[];
   };
 
   const links = roleLinks(role);
   const endMatch = (to: string) =>
-    to === '/app/users' || to === '/superadmin/users' || to === '/app/travel' || to === '/superadmin/travel';
+    to === '/app/users' ||
+    to === '/superadmin/users' ||
+    to === '/app/travel' ||
+    to === '/superadmin/travel' ||
+    to === '/travel/import';
 
   const NavBlock = ({ onNavigate }: { onNavigate?: () => void }) => (
     <>
@@ -148,7 +163,7 @@ export function AppShell() {
               end={endMatch(to)}
               onClick={onNavigate}
               className={({ isActive }) =>
-                cn(navLinkClass({ isActive }), '[&>svg]:opacity-70 [&[aria-current=page]>svg]:text-amber-600 dark:[&[aria-current=page]>svg]:text-amber-300')
+                cn(navLinkClass({ isActive }), '[&>svg]:opacity-70 [&[aria-current=page]>svg]:text-cyan-600 dark:[&[aria-current=page]>svg]:text-cyan-300')
               }
             >
               <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} aria-hidden />
@@ -186,18 +201,19 @@ export function AppShell() {
   const brandSub = 'text-[11px] text-zinc-500 dark:text-zinc-500';
 
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-900 antialiased dark:bg-[#09090b] dark:text-zinc-100">
+    <div className="min-h-screen bg-zinc-50 text-zinc-900 antialiased dark:bg-[#0b0c0f] dark:text-zinc-100">
+      <CommandPalette role={role} />
       <div className="flex min-h-screen">
         <aside className={cn('relative hidden lg:flex', shellAside)}>
           <div
-            className="pointer-events-none absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-amber-400/25 to-transparent dark:via-amber-500/20"
+            className="pointer-events-none absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-cyan-400/20 to-transparent dark:via-cyan-500/15"
             aria-hidden
           />
 
           <div className="border-b border-zinc-200/90 px-4 pb-4 pt-5 dark:border-white/[0.06]">
             <div className="flex items-start gap-3">
               <div
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-zinc-200/90 bg-zinc-50 text-[11px] font-bold text-amber-700 shadow-sm dark:border-white/10 dark:bg-zinc-900/90 dark:text-amber-300/95"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-zinc-200/90 bg-zinc-50 text-[11px] font-bold text-cyan-700 shadow-sm dark:border-white/10 dark:bg-zinc-900/90 dark:text-cyan-300/95"
                 style={{ fontFamily: 'var(--font-mono)' }}
                 aria-hidden
               >
@@ -205,9 +221,9 @@ export function AppShell() {
               </div>
               <div className="min-w-0 flex-1 pt-0.5">
                 <p className={brandTitle} style={{ fontFamily: 'var(--font-display)' }}>
-                  NakedCode
+                  jejeje
                 </p>
-                <p className={brandSub}>Panel operativo</p>
+                <p className={brandSub}>Copiloto comercial</p>
               </div>
             </div>
 
@@ -258,6 +274,32 @@ export function AppShell() {
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <header
             className={cn(
+              'sticky top-0 z-30 hidden items-center justify-between gap-4 border-b px-4 py-2.5 backdrop-blur-xl lg:flex',
+              'border-zinc-200/80 bg-white/90 dark:border-white/[0.06] dark:bg-[#0b0c10]/85',
+            )}
+          >
+            <button
+              type="button"
+              onClick={() => (window as unknown as { __openCommandPalette?: () => void }).__openCommandPalette?.()}
+              className={cn(
+                'flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-xl border px-3 py-2 text-left text-sm transition-colors',
+                'border-zinc-200/90 bg-zinc-50/80 text-zinc-500 hover:border-cyan-500/25 hover:bg-white dark:border-white/[0.07] dark:bg-white/[0.03] dark:text-zinc-500 dark:hover:bg-white/[0.05]',
+              )}
+            >
+              <Search className="h-4 w-4 shrink-0 text-zinc-400" strokeWidth={1.75} />
+              <span className="min-w-0 flex-1 truncate">Buscar o navegar…</span>
+              <kbd className="hidden shrink-0 rounded border border-zinc-200/80 bg-white px-1.5 py-0.5 font-mono text-[10px] text-zinc-500 dark:border-white/10 dark:bg-black/30 dark:text-zinc-600 sm:inline">
+                ⌘K
+              </kbd>
+            </button>
+            <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-600">
+              <Sparkles className="h-3.5 w-3.5 text-cyan-500/80" strokeWidth={1.75} />
+              <span className="hidden xl:inline">IA en contexto</span>
+            </div>
+          </header>
+
+          <header
+            className={cn(
               'sticky top-0 z-30 flex items-center justify-between gap-3 border-b px-4 py-3 backdrop-blur-md lg:hidden',
               'border-zinc-200/90 bg-white/90',
               'dark:border-white/[0.06] dark:bg-zinc-950/90',
@@ -278,14 +320,14 @@ export function AppShell() {
             </button>
             <div className="min-w-0 flex-1 text-center">
               <p className="truncate text-sm font-bold text-zinc-900 dark:text-white" style={{ fontFamily: 'var(--font-display)' }}>
-                NakedCode
+                jejeje
               </p>
               <p className="truncate text-[10px] text-zinc-500">{roleLabel(role)}</p>
             </div>
             <button
               type="button"
               onClick={handleLogout}
-              className="cursor-pointer rounded-lg px-2 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-500/10 dark:text-amber-400/95"
+              className="cursor-pointer rounded-lg px-2 py-1.5 text-xs font-medium text-cyan-700 hover:bg-cyan-500/10 dark:text-cyan-400/95"
             >
               Salir
             </button>
@@ -352,7 +394,7 @@ export function AppShell() {
 
           <main className="relative flex min-h-0 flex-1 flex-col">
             <div
-              className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_85%_50%_at_50%_-15%,rgba(251,191,36,0.07),transparent)] opacity-70 dark:opacity-100"
+              className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_85%_50%_at_50%_-15%,rgba(34,211,238,0.06),transparent)] opacity-90 dark:opacity-100"
               aria-hidden
             />
             <div className="relative flex min-h-0 min-w-0 max-w-none flex-1 flex-col overflow-y-auto overscroll-y-contain px-2 py-3 sm:px-3 sm:py-4 lg:px-4 lg:py-5">

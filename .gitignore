@@ -38,6 +38,9 @@ coverage/
 # Archivos de extracción local
 saas_practicas_nakedcode/docx_content.txt
 
+# PDFs locales de prueba (jejeje)
+jejeje/PDFs/
+
 # Uploads (local); versionar solo el directorio vacío
 saas_practicas_nakedcode/backend/uploads/*
 !saas_practicas_nakedcode/backend/uploads/.gitkeep

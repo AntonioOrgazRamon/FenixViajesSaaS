@@ -11,6 +11,7 @@ import { useAuthStore, defaultPathForRole } from './store/authStore';
 import { LoginPage } from './features/auth/pages/LoginPage';
 import { ForgotPasswordPage } from './features/auth/pages/ForgotPasswordPage';
 import { ResetPasswordPage } from './features/auth/pages/ResetPasswordPage';
+import { GoogleAuthCallbackPage } from './features/auth/pages/GoogleAuthCallbackPage';
 import { ProfilePage } from './features/profile/pages/ProfilePage';
 import { ChangePasswordPage } from './features/profile/pages/ChangePasswordPage';
 import { SessionsPage } from './features/sessions/pages/SessionsPage';
@@ -41,9 +42,12 @@ import { CompanyUserEditPage } from './features/app/pages/CompanyUserEditPage';
 import { CompanyAuditLogsPage } from './features/app/pages/CompanyAuditLogsPage';
 import { CompanyUserSessionsPage } from './features/app/pages/CompanyUserSessionsPage';
 import { AppHomePage } from './features/app/pages/AppHomePage';
+import { MotorRecommendationPage } from './features/app/pages/MotorRecommendationPage';
+import { CompanyIaOpsPage } from './features/app/pages/CompanyIaOpsPage';
 import { LeadsListPage } from './features/leads/pages/LeadsListPage';
 import { LeadDetailPage } from './features/leads/pages/LeadDetailPage';
 import { TravelCatalogPage } from './features/travel/pages/TravelCatalogPage';
+import { TravelImportCenterPage } from './features/travel/pages/TravelImportCenterPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -73,6 +77,7 @@ function App() {
           <Routes>
             <Route element={<GuestRoute />}>
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/auth/google/callback" element={<GoogleAuthCallbackPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
             </Route>
@@ -109,6 +114,7 @@ function App() {
                 <Route element={<RequireRole roles={['COMPANY_ADMIN', 'COMPANY_USER']} />}>
                   <Route path="/leads" element={<LeadsListPage />} />
                   <Route path="/leads/:id" element={<LeadDetailPage />} />
+                  <Route path="/app/motor" element={<MotorRecommendationPage />} />
                   <Route path="/app/users" element={<CompanyUsersListPage />} />
                   <Route
                     path="/app/users/new"
@@ -131,6 +137,7 @@ function App() {
 
                 <Route element={<RequireRole roles={['COMPANY_ADMIN']} />}>
                   <Route path="/app/dashboard" element={<CompanyDashboardPage />} />
+                  <Route path="/app/ia" element={<CompanyIaOpsPage />} />
                   <Route path="/app/travel" element={<TravelCatalogPage />} />
                   <Route path="/app/users/:id/edit" element={<CompanyUserEditPage />} />
                   <Route path="/app/users/:id/sessions" element={<CompanyUserSessionsPage />} />
@@ -139,6 +146,10 @@ function App() {
 
                 <Route element={<RequireRole roles={['COMPANY_USER']} />}>
                   <Route path="/app/home" element={<AppHomePage />} />
+                </Route>
+
+                <Route element={<RequireRole roles={['COMPANY_ADMIN', 'SUPER_ADMIN']} />}>
+                  <Route path="/travel/import" element={<TravelImportCenterPage />} />
                 </Route>
 
                 <Route path="*" element={<NotFoundPage />} />

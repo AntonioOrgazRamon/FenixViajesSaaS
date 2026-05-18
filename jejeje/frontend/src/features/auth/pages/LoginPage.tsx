@@ -32,6 +32,7 @@ const fontDisplay = '"Syne", system-ui, sans-serif';
 const fontMono = '"JetBrains Mono", ui-monospace, monospace';
 
 const NAKEDCODE_URL = 'https://nakedcode.es';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 
 function NakedCodeBrandLink({
   variant = 'inline',
@@ -198,6 +199,10 @@ export const LoginPage = () => {
     } catch (err) {
       setError(getApiErrorMessage(err));
     }
+  };
+
+  const loginWithGoogle = () => {
+    window.location.assign(`${API_BASE_URL}/auth/google/start`);
   };
 
   return (
@@ -464,6 +469,16 @@ export const LoginPage = () => {
                   >
                     <span>{isSubmitting ? 'Entrando…' : 'Entrar al panel'}</span>
                     <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden />
+                  </button>
+                </div>
+
+                <div data-login-reveal>
+                  <button
+                    type="button"
+                    onClick={loginWithGoogle}
+                    className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-white/[0.12] bg-white/[0.03] py-3.5 text-sm font-semibold text-zinc-200 transition-colors hover:bg-white/[0.06]"
+                  >
+                    Continuar con Google
                   </button>
                 </div>
 

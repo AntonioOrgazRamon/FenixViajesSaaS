@@ -1,0 +1,432 @@
+[
+  {
+    "source": {
+      "documentName": "vietnam-sample.pdf",
+      "pageStart": 1,
+      "pageEnd": 12,
+      "rawReference": "Sección catálogo Vietnam Q2",
+      "confidence": 0.94
+    },
+    "trip": {
+      "title": "Vietnam esencial — muestra JSON Import Center",
+      "slug": "qa-json-import-vietnam-esencial",
+      "mainDestination": "Vietnam",
+      "secondaryDestinations": [],
+      "continents": [
+        "Asia"
+      ],
+      "countries": [
+        "Vietnam"
+      ],
+      "regions": [],
+      "cities": [
+        "Hanói",
+        "Ho Chi Minh"
+      ],
+      "islands": [],
+      "durationDays": 10,
+      "durationNights": 9,
+      "priceFrom": 1899,
+      "currency": "EUR",
+      "seasonality": [
+        "Oct-Abr"
+      ],
+      "travelStyles": [
+        "Cultural"
+      ],
+      "idealFor": [
+        "Parejas"
+      ],
+      "luxuryLevel": null,
+      "budgetTier": "Premium",
+      "pace": "Moderado",
+      "familyFriendly": true,
+      "honeymoon": false,
+      "shortDescription": "Circuito cultural compacto con ciudades imperiales y mercados locales.",
+      "longDescription": "Itinerario revisado manualmente para staging → BD. Incluye ciudades clave y margen de mejora en observaciones.",
+      "highlights": [
+        "Guías locales",
+        "Crucero Ha Long",
+        "Hoteles boutique seleccionados"
+      ],
+      "includedServices": [
+        "Vuelos internos según programa",
+        "Desayunos",
+        "Traslados privados"
+      ],
+      "excludedServices": [
+        "Seguro de viaje",
+        "Propinas"
+      ],
+      "hotels": [
+        {
+          "hotelName": "Ejemplo Boutique Hanói",
+          "city": "Hanói",
+          "category": "4*"
+        }
+      ],
+      "transport": [],
+      "mealPlan": [
+        "Media pensión según día"
+      ],
+      "itinerary": [
+        {
+          "day": 1,
+          "title": "Llegada a Hanói",
+          "description": "Traslado y primer contacto con la ciudad antigua.",
+          "locations": []
+        },
+        {
+          "dayNumber": 2,
+          "title": "Hanói monumental",
+          "description": "Mausoleo, templo y casco histórico.",
+          "locations": [
+            "Hanói"
+          ]
+        },
+        {
+          "day": 3,
+          "title": "Bahía de Ha Long",
+          "description": "Crucero de día completo.",
+          "locations": []
+        }
+      ],
+      "importantNotes": [],
+      "availabilityNotes": [],
+      "requirements": [],
+      "rawSnippets": []
+    },
+    "metadata": {
+      "extractionConfidence": 0.92,
+      "needsManualReview": false,
+      "missingImportantFields": [],
+      "possibleProblems": []
+    }
+  },
+  {
+    "source": {
+      "documentName": null,
+      "pageStart": null,
+      "pageEnd": null,
+      "rawReference": null,
+      "confidence": null
+    },
+    "trip": {
+      "title": "Ejemplo con avisos (WARNING)",
+      "slug": "qa-json-import-warning-sample",
+      "mainDestination": "Sudeste asiático",
+      "secondaryDestinations": [],
+      "continents": [],
+      "countries": [],
+      "regions": [],
+      "cities": [],
+      "islands": [],
+      "durationDays": 12,
+      "durationNights": null,
+      "priceFrom": null,
+      "currency": "EUR",
+      "seasonality": [],
+      "travelStyles": [],
+      "idealFor": [],
+      "luxuryLevel": null,
+      "budgetTier": null,
+      "pace": null,
+      "familyFriendly": null,
+      "honeymoon": null,
+      "shortDescription": "",
+      "longDescription": "",
+      "highlights": [],
+      "includedServices": [],
+      "excludedServices": [],
+      "hotels": [],
+      "transport": [],
+      "mealPlan": [],
+      "itinerary": [],
+      "importantNotes": [],
+      "availabilityNotes": [],
+      "requirements": [],
+      "rawSnippets": []
+    },
+    "metadata": {
+      "extractionConfidence": 0.35,
+      "needsManualReview": true,
+      "missingImportantFields": [
+        "priceFrom",
+        "countries"
+      ],
+      "possibleProblems": [
+        "Geo ambigua vs destinos listados"
+      ]
+    }
+  },
+  {
+    "source": {
+      "documentName": "chatgpt-export.md",
+      "pageStart": null,
+      "pageEnd": null,
+      "rawReference": null,
+      "confidence": 0.88
+    },
+    "trip": {
+      "title": "Argentina panoramica A",
+      "slug": "qa-json-import-argentina-chatgpt-a",
+      "mainDestination": "Argentina",
+      "secondaryDestinations": [],
+      "continents": [
+        "America del Sur"
+      ],
+      "countries": [
+        "Argentina"
+      ],
+      "regions": [],
+      "cities": [
+        "Buenos Aires",
+        "El Calafate"
+      ],
+      "islands": [],
+      "durationDays": 10,
+      "durationNights": 9,
+      "priceFrom": null,
+      "currency": "EUR",
+      "seasonality": [
+        "Sep-May"
+      ],
+      "travelStyles": [
+        "Gastronomía",
+        "Cultura",
+        "Vino",
+        "Ciudad",
+        "Tradiciones locales",
+        "Naturaleza",
+        "Glaciares",
+        "Cataratas"
+      ],
+      "idealFor": [
+        "Parejas"
+      ],
+      "luxuryLevel": null,
+      "budgetTier": null,
+      "pace": "moderate",
+      "familyFriendly": null,
+      "honeymoon": null,
+      "shortDescription": "Circuito estilo salida ChatGPT.",
+      "longDescription": "Prueba compatibilidad ritmo moderate y estilos ES.",
+      "highlights": [
+        "Perito Moreno",
+        "Buenos Aires"
+      ],
+      "includedServices": [],
+      "excludedServices": [],
+      "hotels": [],
+      "transport": [],
+      "mealPlan": [],
+      "itinerary": [
+        {
+          "day": 1,
+          "title": "Dia 1",
+          "description": "Actividades programadas.",
+          "locations": []
+        },
+        {
+          "day": 2,
+          "title": "Dia 2",
+          "description": "Actividades programadas.",
+          "locations": []
+        },
+        {
+          "day": 3,
+          "title": "Dia 3",
+          "description": "Actividades programadas.",
+          "locations": []
+        },
+        {
+          "day": 4,
+          "title": "Dia 4",
+          "description": "Actividades programadas.",
+          "locations": []
+        },
+        {
+          "day": 5,
+          "title": "Dia 5",
+          "description": "Actividades programadas.",
+          "locations": []
+        },
+        {
+          "day": 6,
+          "title": "Dia 6",
+          "description": "Actividades programadas.",
+          "locations": []
+        },
+        {
+          "day": 7,
+          "title": "Dia 7",
+          "description": "Actividades programadas.",
+          "locations": []
+        },
+        {
+          "day": 8,
+          "title": "Dia 8",
+          "description": "Actividades programadas.",
+          "locations": []
+        },
+        {
+          "day": 9,
+          "title": "Dia 9",
+          "description": "Actividades programadas.",
+          "locations": []
+        },
+        {
+          "day": 10,
+          "title": "Dia 10",
+          "description": "Actividades programadas.",
+          "locations": []
+        }
+      ],
+      "importantNotes": [],
+      "availabilityNotes": [],
+      "requirements": [],
+      "rawSnippets": []
+    },
+    "metadata": {
+      "extractionConfidence": 0.72,
+      "needsManualReview": false,
+      "missingImportantFields": [],
+      "possibleProblems": []
+    }
+  },
+  {
+    "source": {
+      "documentName": "chatgpt-export.md",
+      "pageStart": null,
+      "pageEnd": null,
+      "rawReference": null,
+      "confidence": 0.88
+    },
+    "trip": {
+      "title": "Argentina panoramica B",
+      "slug": "qa-json-import-argentina-chatgpt-b",
+      "mainDestination": "Argentina",
+      "secondaryDestinations": [],
+      "continents": [
+        "America del Sur"
+      ],
+      "countries": [
+        "Argentina"
+      ],
+      "regions": [],
+      "cities": [
+        "Buenos Aires",
+        "El Calafate"
+      ],
+      "islands": [],
+      "durationDays": 10,
+      "durationNights": 9,
+      "priceFrom": null,
+      "currency": "EUR",
+      "seasonality": [
+        "Sep-May"
+      ],
+      "travelStyles": [
+        "Gastronomía",
+        "Cultura",
+        "Vino",
+        "Ciudad",
+        "Tradiciones locales",
+        "Naturaleza",
+        "Glaciares",
+        "Cataratas"
+      ],
+      "idealFor": [
+        "Parejas"
+      ],
+      "luxuryLevel": null,
+      "budgetTier": null,
+      "pace": "moderate",
+      "familyFriendly": null,
+      "honeymoon": null,
+      "shortDescription": "Circuito estilo salida ChatGPT.",
+      "longDescription": "Prueba compatibilidad ritmo moderate y estilos ES.",
+      "highlights": [
+        "Perito Moreno",
+        "Buenos Aires"
+      ],
+      "includedServices": [],
+      "excludedServices": [],
+      "hotels": [],
+      "transport": [],
+      "mealPlan": [],
+      "itinerary": [
+        {
+          "day": 1,
+          "title": "Dia 1",
+          "description": "Actividades programadas.",
+          "locations": []
+        },
+        {
+          "day": 2,
+          "title": "Dia 2",
+          "description": "Actividades programadas.",
+          "locations": []
+        },
+        {
+          "day": 3,
+          "title": "Dia 3",
+          "description": "Actividades programadas.",
+          "locations": []
+        },
+        {
+          "day": 4,
+          "title": "Dia 4",
+          "description": "Actividades programadas.",
+          "locations": []
+        },
+        {
+          "day": 5,
+          "title": "Dia 5",
+          "description": "Actividades programadas.",
+          "locations": []
+        },
+        {
+          "day": 6,
+          "title": "Dia 6",
+          "description": "Actividades programadas.",
+          "locations": []
+        },
+        {
+          "day": 7,
+          "title": "Dia 7",
+          "description": "Actividades programadas.",
+          "locations": []
+        },
+        {
+          "day": 8,
+          "title": "Dia 8",
+          "description": "Actividades programadas.",
+          "locations": []
+        },
+        {
+          "day": 9,
+          "title": "Dia 9",
+          "description": "Actividades programadas.",
+          "locations": []
+        },
+        {
+          "day": 10,
+          "title": "Dia 10",
+          "description": "Actividades programadas.",
+          "locations": []
+        }
+      ],
+      "importantNotes": [],
+      "availabilityNotes": [],
+      "requirements": [],
+      "rawSnippets": []
+    },
+    "metadata": {
+      "extractionConfidence": 0.72,
+      "needsManualReview": false,
+      "missingImportantFields": [],
+      "possibleProblems": []
+    }
+  }
+]

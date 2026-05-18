@@ -1,6 +1,7 @@
 import { LeadStatus } from '@prisma/client';
 
 const TRANSITIONS: Record<LeadStatus, LeadStatus[]> = {
+  PENDING_REVIEW: ['NEW', 'QUALIFYING', 'LOST'],
   NEW: ['QUALIFYING'],
   QUALIFYING: ['QUALIFIED', 'LOST'],
   QUALIFIED: ['CONTACTED', 'LOST'],

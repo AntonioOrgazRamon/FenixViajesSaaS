@@ -56,8 +56,11 @@ interface AuthState {
   token: string | null;
   refreshToken: string | null;
   isAuthenticated: boolean;
+  isBootstrapping: boolean;
+  setTokens: (accessToken: string, refreshToken?: string) => void;
   setAuth: (user: AuthUser, accessToken: string, refreshToken?: string) => void;
   setUser: (user: AuthUser) => void;
+  setBootstrapping: (value: boolean) => void;
   logout: () => void;
 }
 
@@ -66,6 +69,17 @@ export const useAuthStore = create<AuthState>((set) => ({
   token: localStorage.getItem('token'),
   refreshToken: localStorage.getItem('refreshToken'),
   isAuthenticated: !!localStorage.getItem('token'),
+  isBootstrapping: !!localStorage.getItem('token'),
+  setTokens: (accessToken, refreshToken) => {
+    localStorage.setItem('token', accessToken);
+    if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
+    set({
+      token: accessToken,
+      refreshToken: refreshToken ?? null,
+      isAuthenticated: true,
+      isBootstrapping: true,
+    });
+  },
   setAuth: (user, accessToken, refreshToken) => {
     localStorage.setItem('token', accessToken);
     if (refreshToken) {
@@ -76,15 +90,44 @@ export const useAuthStore = create<AuthState>((set) => ({
       token: accessToken,
       refreshToken: refreshToken ?? null,
       isAuthenticated: true,
+      isBootstrapping: false,
     });
   },
-  setUser: (user) => set({ user }),
+  setUser: (user) => set({ user, isBootstrapping: false }),
+  setBootstrapping: (value) => set({ isBootstrapping: value }),
   logout: () => {
     localStorage.removeItem('token');
     localStorage.removeItem('refreshToken');
-    set({ user: null, token: null, refreshToken: null, isAuthenticated: false });
+    set({ user: null, token: null, refreshToken: null, isAuthenticated: false, isBootstrapping: false });
   },
 }));
+
+let authStorageSyncInitialized = false;
+export function initAuthStorageSync() {
+  if (authStorageSyncInitialized || typeof window === 'undefined') return;
+  authStorageSyncInitialized = true;
+  window.addEventListener('storage', (event) => {
+    if (event.key !== 'token' && event.key !== 'refreshToken') return;
+    const token = localStorage.getItem('token');
+    const refreshToken = localStorage.getItem('refreshToken');
+    if (!token) {
+      useAuthStore.setState({
+        user: null,
+        token: null,
+        refreshToken: null,
+        isAuthenticated: false,
+        isBootstrapping: false,
+      });
+      return;
+    }
+    useAuthStore.setState({
+      token,
+      refreshToken,
+      isAuthenticated: true,
+      isBootstrapping: true,
+    });
+  });
+}
 
 export function defaultPathForRole(role: AppRole): string {
   if (role === 'SUPER_ADMIN') return '/superadmin/dashboard';

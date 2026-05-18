@@ -71,6 +71,7 @@ enum LeadSource {
 }
 
 enum LeadStatus {
+  PENDING_REVIEW
   NEW
   QUALIFYING
   QUALIFIED
@@ -111,6 +112,10 @@ enum LeadActivityType {
   CONTACTED
   IMPORT
   EXTERNAL_EVENT
+  /// Propuesta comercial generada (p. ej. PDF/listo para revisión).
+  PROPOSAL_GENERATED
+  /// Intento de aviso al vendedor o admins (email u otros canales); ver metadata.
+  SELLER_NOTIFIED
 }
 
 enum LeadAgentTriggerType {
@@ -128,6 +133,109 @@ enum LeadAgentRunStatus {
   SKIPPED
 }
 
+/// Ciclo de vida de la propuesta comercial (independiente del estado del viaje en catálogo).
+enum ProposalStatus {
+  DRAFT
+  GENERATED
+  SENT_TO_SELLER
+  SENT_TO_CLIENT
+  ARCHIVED
+}
+
+/// Adjuntos u otros binarios por versión (PDF principal también puede vivir en ProposalVersion).
+enum ProposalArtifactKind {
+  PDF
+  HTML_FILE
+  ATTACHMENT
+  OTHER
+}
+
+// ---------------------------------------------------------------------------
+// Ontología de viajes + motor de recomendación (Fase 1, sin embeddings)
+// ---------------------------------------------------------------------------
+
+enum LuxuryLevel {
+  UNKNOWN
+  ECONOMY
+  STANDARD
+  COMFORT
+  UPSCALE
+  LUXURY
+  ULTRA
+}
+
+enum TripBudgetTier {
+  UNKNOWN
+  VALUE
+  MID
+  UPPER_MID
+  PREMIUM
+  ULTRA_PREMIUM
+}
+
+enum TripPace {
+  UNKNOWN
+  RELAXED
+  BALANCED
+  INTENSIVE
+}
+
+enum TripClimatePreference {
+  UNKNOWN
+  ANY
+  TROPICAL
+  TEMPERATE
+  COLD
+  DESERT
+  MEDITERRANEAN
+  MIXED
+}
+
+enum TripExclusivity {
+  UNKNOWN
+  GROUP
+  SEMI_PRIVATE
+  PRIVATE
+  BESPOKE
+}
+
+/// Ejes de experiencia estructurados (extensible; futuro: embeddings por eje).
+enum TravelStyleAxis {
+  CULTURE
+  BEACH
+  NATURE
+  ADVENTURE
+  GASTRONOMY
+  WELLNESS
+  NIGHTLIFE
+  CITY_BREAK
+  CRUISE
+  SAFARI
+  SKI
+  ROAD_TRIP
+  SHOPPING
+  FAMILY
+  HONEYMOON
+  SENIOR_FRIENDLY
+  ACCESSIBILITY
+  WILDLIFE
+  PHOTOGRAPHY
+}
+
+enum RecommendationMatchState {
+  STRONG_MATCH
+  WEAK_MATCH
+  NO_MATCH
+  NEEDS_CLARIFICATION
+}
+
+enum CommercialSlotKind {
+  RECOMMENDED
+  BUDGET
+  LUXURY
+  ALTERNATIVE
+}
+
 model Company {
   id                String        @id @default(uuid()) @db.Char(36)
   name              String        @db.VarChar(150)
@@ -139,6 +247,8 @@ model Company {
   deletedAt         DateTime?     @map("deleted_at")
   createdBy         String?       @map("created_by") @db.Char(36)
   integrationToken  String?       @unique @map("integration_token") @db.VarChar(64)
+  /// Políticas de recomendación por tenant (p. ej. proveedores bloqueados, ratios). JSON libre validado en servidor.
+  recommendationPolicy Json?      @map("recommendation_policy")
 
   users             User[]
   auditLogs         AuditLog[]
@@ -151,7 +261,20 @@ model Company {
   travelDocuments   TravelDocument[]
   travelTrips       TravelTrip[]
   destinations      Destination[]
+  geoPlaces         GeoPlace[]
   travelImportJobs  TravelImportJob[]
+  proposals         Proposal[]
+  proposalVersions  ProposalVersion[]
+  proposalTrips     ProposalTrip[]
+  proposalArtifacts ProposalArtifact[]
+  recommendationRuns     RecommendationRun[]
+  recommendationFeedback RecommendationFeedback[]
+  recommendationItems    RecommendationItem[]
+  tripEmbeddings         TravelTripEmbedding[]
+  openAIUsageLogs        OpenAIUsageLog[]
+  openAIUsageBudget      OpenAIUsageBudget?
+  travelJsonImportBatches TravelJsonImportBatch[]
+  travelJsonImportItems   TravelJsonImportItem[]
 
   @@index([status])
   @@map("companies")
@@ -195,11 +318,17 @@ model User {
   company             Company?      @relation(fields: [companyId], references: [id])
   sessions            Session[]
   resetTokens         PasswordResetToken[]
-  auditLogs           AuditLog[]    @relation("ActorLogs")
-  assignedLeads       Lead[]        @relation("LeadAssigned")
-  createdLeads        Lead[]        @relation("LeadCreated")
-  leadActivities      LeadActivity[]
-  leadNotes           LeadNote[]
+  auditLogs                 AuditLog[]        @relation("ActorLogs")
+  uploadedTravelJsonBatches TravelJsonImportBatch[] @relation("TravelJsonImportUploadedBy")
+  assignedLeads             Lead[]            @relation("LeadAssigned")
+  createdLeads              Lead[]            @relation("LeadCreated")
+  leadActivities            LeadActivity[]
+  leadNotes                 LeadNote[]
+  proposalsCreated          Proposal[]        @relation("ProposalCreatedBy")
+  proposalsAssigned         Proposal[]        @relation("ProposalAssigned")
+  proposalVersionsCreated   ProposalVersion[] @relation("ProposalVersionCreatedBy")
+  recommendationRunsCreated RecommendationRun[] @relation("RecommendationRunCreatedBy")
+  openAIUsageLogs              OpenAIUsageLog[]
 
   @@index([companyId, role, status])
   @@index([companyId, status])
@@ -308,6 +437,8 @@ model Lead {
   activities         LeadActivity[]
   notes              LeadNote[]
   agentRuns          LeadAgentRun[]
+  proposals          Proposal[]
+  recommendationRuns RecommendationRun[]
 
   @@index([companyId, status, createdAt])
   @@index([companyId, source, createdAt])
@@ -425,6 +556,33 @@ enum DestinationKind {
   ATTRACTION
 }
 
+/// Jerarquía geográfica por tenant (progresiva; coexiste con Destination legacy).
+enum GeoPlaceKind {
+  CONTINENT
+  MACRO_REGION
+  COUNTRY
+  REGION
+  CITY
+  ISLAND
+  AREA
+  ATTRACTION
+  POI
+}
+
+enum TripGeoPlaceRole {
+  PRIMARY
+  STOP
+  TRANSIT
+  OPTIONAL
+}
+
+enum TripGeoPlaceSource {
+  MANUAL
+  IMPORT
+  AI
+  BACKFILL
+}
+
 enum TripServiceKind {
   INCLUDED
   NOT_INCLUDED
@@ -437,6 +595,21 @@ enum TravelImportJobStatus {
   SUCCESS
   FAILED
   CANCELLED
+}
+
+enum TravelJsonImportBatchStatus {
+  UPLOADED
+  VALIDATED
+  PARTIAL_ERRORS
+  APPROVED
+  IMPORTED
+  FAILED
+}
+
+enum TravelJsonImportItemValidationStatus {
+  VALID
+  WARNING
+  INVALID
 }
 
 model TravelDocument {
@@ -466,6 +639,8 @@ model TravelTrip {
   id                 String            @id @default(uuid()) @db.Char(36)
   companyId          String            @map("company_id") @db.Char(36)
   documentId         String?           @map("document_id") @db.Char(36)
+  /// Slug estable por tenant para deduplicar importaciones JSON (no confundir con URL pública).
+  importSlug         String?           @map("import_slug") @db.VarChar(200)
   title              String            @db.VarChar(500)
   provider           String?           @db.VarChar(255)
   season             String?           @db.VarChar(120)
@@ -480,6 +655,13 @@ model TravelTrip {
   sourcePageStart    Int?              @map("source_page_start")
   sourcePageEnd      Int?              @map("source_page_end")
   rawExtractedText   String?           @map("raw_extracted_text") @db.LongText
+  luxuryLevel        LuxuryLevel       @default(UNKNOWN) @map("luxury_level")
+  budgetTier         TripBudgetTier    @default(UNKNOWN) @map("budget_tier")
+  pace               TripPace          @default(UNKNOWN)
+  climatePreference  TripClimatePreference @default(UNKNOWN) @map("climate_preference")
+  exclusivity        TripExclusivity    @default(UNKNOWN)
+  /// Reservado Fase 2: clave de namespace para vectores / features precomputados.
+  embeddingKey       String?           @map("embedding_key") @db.VarChar(120)
   createdAt          DateTime          @default(now()) @map("created_at")
   updatedAt          DateTime          @updatedAt @map("updated_at")
 
@@ -492,11 +674,99 @@ model TravelTrip {
   hotels             TripHotel[]
   highlights         TripHighlight[]
   observations       TripObservation[]
+  proposalTrips      ProposalTrip[]
+  styleTags          TravelTripStyleTag[]
+  recommendationItems RecommendationItem[]
+  embeddings         TravelTripEmbedding[]
+  tripGeoPlaces      TripGeoPlace[]
+  jsonImportItems    TravelJsonImportItem[]
 
+  @@unique([companyId, importSlug])
   @@index([companyId, status, createdAt])
   @@index([companyId, documentId])
   @@index([documentId])
   @@map("travel_trips")
+}
+
+model TravelJsonImportBatch {
+  id               String                     @id @default(uuid()) @db.Char(36)
+  companyId        String                     @map("company_id") @db.Char(36)
+  uploadedByUserId String                     @map("uploaded_by_user_id") @db.Char(36)
+  fileName         String                     @map("file_name") @db.VarChar(500)
+  status           TravelJsonImportBatchStatus
+  totalItems       Int                        @map("total_items")
+  validItems       Int                        @map("valid_items")
+  invalidItems     Int                        @map("invalid_items")
+  createdAt        DateTime                   @default(now()) @map("created_at")
+  updatedAt        DateTime                   @updatedAt @map("updated_at")
+
+  company       Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  uploadedBy    User    @relation("TravelJsonImportUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: Cascade)
+  items         TravelJsonImportItem[]
+
+  @@index([companyId, createdAt])
+  @@index([companyId, status])
+  @@map("travel_json_import_batches")
+}
+
+model TravelJsonImportItem {
+  id                 String                             @id @default(uuid()) @db.Char(36)
+  batchId            String                             @map("batch_id") @db.Char(36)
+  companyId          String                             @map("company_id") @db.Char(36)
+  sourceJson         Json                               @map("source_json")
+  normalizedJson     Json                               @map("normalized_json")
+  validationStatus   TravelJsonImportItemValidationStatus @map("validation_status")
+  validationErrors   Json                               @map("validation_errors")
+  validationWarnings Json                               @map("validation_warnings")
+  importedTripId     String?                            @map("imported_trip_id") @db.Char(36)
+  createdAt          DateTime                           @default(now()) @map("created_at")
+  updatedAt          DateTime                           @updatedAt @map("updated_at")
+
+  batch         TravelJsonImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  company       Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  importedTrip  TravelTrip?         @relation(fields: [importedTripId], references: [id], onDelete: SetNull)
+
+  @@index([batchId, validationStatus])
+  @@index([companyId, batchId])
+  @@map("travel_json_import_items")
+}
+
+/// Vector / texto embebido para retrieval híbrido (Fase 2). Multi-modelo por viaje.
+model TravelTripEmbedding {
+  id          String   @id @default(uuid()) @db.Char(36)
+  companyId   String   @map("company_id") @db.Char(36)
+  tripId      String   @map("trip_id") @db.Char(36)
+  model       String   @db.VarChar(80)
+  dims        Int
+  /// Vector denso almacenado como JSON array de floats (MySQL sin pgvector).
+  vector      Json
+  /// Referencia futura Qdrant/Pinecone.
+  externalVectorId String? @map("external_vector_id") @db.VarChar(200)
+  contentHash String   @map("content_hash") @db.VarChar(64)
+  content     String   @db.Text
+  metadata    Json
+  profileVersion Int   @default(1) @map("profile_version")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  trip    TravelTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, tripId, model])
+  @@index([companyId, tripId])
+  @@index([companyId, contentHash])
+  @@map("travel_trip_embeddings")
+}
+
+model TravelTripStyleTag {
+  tripId String         @map("trip_id") @db.Char(36)
+  style  TravelStyleAxis
+
+  trip TravelTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@id([tripId, style])
+  @@index([style])
+  @@map("travel_trip_style_tags")
 }
 
 model Destination {
@@ -527,6 +797,51 @@ model TravelTripDestination {
   @@id([tripId, destinationId])
   @@index([destinationId])
   @@map("travel_trip_destinations")
+}
+
+/// Lugar geográfico jerárquico por empresa (`companyId` obligatorio = multi-tenant seguro).
+model GeoPlace {
+  id              String        @id @default(uuid()) @db.Char(36)
+  companyId       String        @map("company_id") @db.Char(36)
+  kind            GeoPlaceKind
+  canonicalName   String        @map("canonical_name") @db.VarChar(255)
+  normalizedKey   String        @map("normalized_key") @db.VarChar(255)
+  parentId        String?       @map("parent_id") @db.Char(36)
+  externalRef     String?       @map("external_ref") @db.VarChar(120)
+  /// Traza opcional al Destination legacy que originó este nodo en backfill.
+  legacyDestinationId String?   @unique @map("legacy_destination_id") @db.Char(36)
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  company         Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  parent          GeoPlace?     @relation("GeoPlaceHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children        GeoPlace[]    @relation("GeoPlaceHierarchy")
+  tripGeoPlaces   TripGeoPlace[]
+
+  @@unique([companyId, normalizedKey, kind])
+  @@index([companyId, normalizedKey])
+  @@index([companyId, kind])
+  @@index([parentId])
+  @@map("geo_places")
+}
+
+/// Enlace viaje ↔ lugar geográfico (dual-read con TravelTripDestination durante la transición).
+model TripGeoPlace {
+  tripId      String            @map("trip_id") @db.Char(36)
+  geoPlaceId  String            @map("geo_place_id") @db.Char(36)
+  role        TripGeoPlaceRole
+  orderIndex  Int               @default(0) @map("order_index")
+  confidence  Float?
+  source      TripGeoPlaceSource
+  createdAt   DateTime          @default(now()) @map("created_at")
+
+  trip        TravelTrip        @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  geoPlace    GeoPlace          @relation(fields: [geoPlaceId], references: [id], onDelete: Cascade)
+
+  @@id([tripId, geoPlaceId])
+  @@index([tripId])
+  @@index([geoPlaceId])
+  @@map("trip_geo_places")
 }
 
 model TripItineraryDay {
@@ -642,4 +957,237 @@ model TravelImportJob {
   @@index([companyId, documentId, createdAt])
   @@index([status, createdAt])
   @@map("travel_import_jobs")
+}
+
+model RecommendationRun {
+  id                   String                   @id @default(uuid()) @db.Char(36)
+  companyId            String                   @map("company_id") @db.Char(36)
+  leadId               String?                  @map("lead_id") @db.Char(36)
+  createdByUserId      String?                  @map("created_by_user_id") @db.Char(36)
+  intentSnapshot       Json                     @map("intent_snapshot")
+  scoringModelVersion  String                   @map("scoring_model_version") @db.VarChar(64)
+  matchState           RecommendationMatchState @map("match_state")
+  globalConfidence     Float?                   @map("global_confidence")
+  validationSummary    Json?                   @map("validation_summary")
+  fallbackHints        Json?                   @map("fallback_hints")
+  telemetry            Json?
+  catalogCandidateCount Int                    @map("catalog_candidate_count")
+  /// Stats de retrieval híbrido (Fase 2): pesos, pool, advertencias.
+  retrievalSummary     Json?                  @map("retrieval_summary")
+  /// Fase 2: namespace de embeddings / chunking.
+  embeddingNamespace   String?                @map("embedding_namespace") @db.VarChar(120)
+  createdAt            DateTime              @default(now()) @map("created_at")
+
+  company       Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead          Lead?                @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  createdByUser User?                @relation("RecommendationRunCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  items         RecommendationItem[]
+  feedback      RecommendationFeedback[]
+
+  @@index([companyId, createdAt])
+  @@index([companyId, leadId])
+  @@map("recommendation_runs")
+}
+
+model RecommendationItem {
+  id               String                   @id @default(uuid()) @db.Char(36)
+  companyId        String                   @map("company_id") @db.Char(36)
+  runId            String                   @map("run_id") @db.Char(36)
+  travelTripId     String                   @map("travel_trip_id") @db.Char(36)
+  rankIndex        Int                      @map("rank_index")
+  commercialSlot   CommercialSlotKind?      @map("commercial_slot")
+  finalScore       Float                    @map("final_score")
+  matchState       RecommendationMatchState @map("match_state")
+  contributions    Json
+  diversityPenalty Float?                   @map("diversity_penalty")
+  explainability   Json?
+
+  company   Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  run       RecommendationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  travelTrip TravelTrip       @relation(fields: [travelTripId], references: [id], onDelete: Restrict)
+
+  @@index([companyId, runId])
+  @@index([runId, rankIndex])
+  @@map("recommendation_items")
+}
+
+model RecommendationFeedback {
+  id          String   @id @default(uuid()) @db.Char(36)
+  companyId   String   @map("company_id") @db.Char(36)
+  runId       String   @map("run_id") @db.Char(36)
+  rating      Int?
+  helpful     Boolean?
+  comment     String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  company Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  run     RecommendationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, runId])
+  @@map("recommendation_feedback")
+}
+
+// ---------------------------------------------------------------------------
+// Propuestas comerciales de viajes por lead (multiempresa, versionado)
+// ---------------------------------------------------------------------------
+
+model Proposal {
+  id              String         @id @default(uuid()) @db.Char(36)
+  companyId       String         @map("company_id") @db.Char(36)
+  leadId          String         @map("lead_id") @db.Char(36)
+  createdByUserId String?        @map("created_by_user_id") @db.Char(36)
+  assignedUserId  String?        @map("assigned_user_id") @db.Char(36)
+  status          ProposalStatus @default(DRAFT)
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  company         Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead            Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  createdByUser   User?          @relation("ProposalCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  assignedUser    User?          @relation("ProposalAssigned", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  versions        ProposalVersion[]
+
+  @@index([companyId, leadId, createdAt])
+  @@index([companyId, status, updatedAt])
+  @@index([leadId])
+  @@map("proposals")
+}
+
+model ProposalVersion {
+  id              String   @id @default(uuid()) @db.Char(36)
+  companyId       String   @map("company_id") @db.Char(36)
+  proposalId      String   @map("proposal_id") @db.Char(36)
+  versionNumber   Int      @map("version_number")
+  /// Snapshot de intención/criterios al generar esta versión (JSON libre).
+  intentSnapshot  Json?    @map("intent_snapshot")
+  generatedHtml   String?  @map("generated_html") @db.LongText
+  pdfStoragePath  String?  @map("pdf_storage_path") @db.VarChar(1000)
+  pdfPublicUrl    String?  @map("pdf_public_url") @db.VarChar(1000)
+  createdByUserId String?  @map("created_by_user_id") @db.Char(36)
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  company         Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  proposal        Proposal          @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  createdByUser   User?             @relation("ProposalVersionCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  trips           ProposalTrip[]
+  artifacts       ProposalArtifact[]
+
+  @@unique([proposalId, versionNumber])
+  @@index([companyId, proposalId])
+  @@index([proposalId, createdAt])
+  @@map("proposal_versions")
+}
+
+model ProposalTrip {
+  id                String   @id @default(uuid()) @db.Char(36)
+  companyId         String   @map("company_id") @db.Char(36)
+  proposalVersionId String   @map("proposal_version_id") @db.Char(36)
+  travelTripId      String   @map("travel_trip_id") @db.Char(36)
+  orderIndex        Int      @default(0) @map("order_index")
+  score             Float?
+  /// Motivos de scoring / explicación (p. ej. string[] u objeto estructurado).
+  reasons           Json?
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  company           Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  proposalVersion   ProposalVersion @relation(fields: [proposalVersionId], references: [id], onDelete: Cascade)
+  travelTrip        TravelTrip      @relation(fields: [travelTripId], references: [id], onDelete: Restrict)
+
+  @@unique([proposalVersionId, travelTripId])
+  @@index([companyId, proposalVersionId])
+  @@index([travelTripId])
+  @@map("proposal_trips")
+}
+
+model ProposalArtifact {
+  id                String               @id @default(uuid()) @db.Char(36)
+  companyId         String               @map("company_id") @db.Char(36)
+  proposalVersionId String               @map("proposal_version_id") @db.Char(36)
+  kind              ProposalArtifactKind
+  storagePath       String               @map("storage_path") @db.VarChar(1000)
+  publicUrl         String?              @map("public_url") @db.VarChar(1000)
+  mimeType          String?              @map("mime_type") @db.VarChar(120)
+  fileSize          Int?                 @map("file_size")
+  metadata          Json?
+  createdAt         DateTime             @default(now()) @map("created_at")
+
+  company           Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  proposalVersion   ProposalVersion @relation(fields: [proposalVersionId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, proposalVersionId])
+  @@index([companyId, kind])
+  @@map("proposal_artifacts")
+}
+
+// ---------------------------------------------------------------------------
+// OpenAI — control de gasto, auditoría y presupuestos por tenant (multi-tenant)
+// ---------------------------------------------------------------------------
+
+enum OpenAIOperationType {
+  INTENT_EXTRACTION
+  PROPOSAL_COPY
+  EMBEDDING
+  TRIP_PDF_EXTRACTION
+  OTHER
+}
+
+enum OpenAIUsageLogStatus {
+  SUCCESS
+  BLOCKED
+  ERROR
+  FALLBACK
+}
+
+model OpenAIUsageLog {
+  id             String                @id @default(uuid()) @db.Char(36)
+  companyId      String                @map("company_id") @db.Char(36)
+  userId         String?               @map("user_id") @db.Char(36)
+  operationType  OpenAIOperationType   @map("operation_type")
+  model          String                @db.VarChar(80)
+  inputTokens    Int                   @default(0) @map("input_tokens")
+  outputTokens   Int                   @default(0) @map("output_tokens")
+  totalTokens    Int                   @default(0) @map("total_tokens")
+  estimatedCost  Decimal?              @map("estimated_cost") @db.Decimal(14, 6)
+  requestId      String?               @map("request_id") @db.VarChar(120)
+  status         OpenAIUsageLogStatus
+  errorCode      String?               @map("error_code") @db.VarChar(64)
+  durationMs     Int?                  @map("duration_ms")
+  metadata       Json?
+  createdAt      DateTime              @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, createdAt])
+  @@index([userId, createdAt])
+  @@index([operationType, createdAt])
+  @@index([status, createdAt])
+  @@map("openai_usage_logs")
+}
+
+model OpenAIUsageBudget {
+  id                    String    @id @default(uuid()) @db.Char(36)
+  companyId             String    @unique @map("company_id") @db.Char(36)
+  dailyLimitEuros       Decimal?  @map("daily_limit_euros") @db.Decimal(14, 6)
+  monthlyLimitEuros     Decimal?  @map("monthly_limit_euros") @db.Decimal(14, 6)
+  maxCallsPerHour       Int?      @map("max_calls_per_hour")
+  maxTokensPerRequest   Int?      @map("max_tokens_per_request")
+  userDailyLimitEuros   Decimal?  @map("user_daily_limit_euros") @db.Decimal(14, 6)
+  isEnabled             Boolean   @default(true) @map("is_enabled")
+  hardBlocked           Boolean   @default(false) @map("hard_blocked")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("openai_usage_budgets")
+}
+
+/// Estado global (una fila `default`). Kill switch en BD además de variables de entorno.
+model OpenAISystemState {
+  id               String   @id @db.VarChar(32)
+  globalKillSwitch Boolean  @default(false) @map("global_kill_switch")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("openai_system_state")
 }

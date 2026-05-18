@@ -1,7 +1,17 @@
 import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
-import { loginSchema, refreshSchema, updateProfileSchema, changePasswordSchema, requestPasswordResetSchema, verifyResetTokenSchema, resetPasswordSchema } from './auth.schema';
+import {
+  loginSchema,
+  refreshSchema,
+  updateProfileSchema,
+  changePasswordSchema,
+  requestPasswordResetSchema,
+  verifyResetTokenSchema,
+  resetPasswordSchema,
+  googleExchangeSchema,
+} from './auth.schema';
 import { ValidationError } from '../../common/errors/AppError';
+import { config } from '../../common/config';
 
 const authService = new AuthService();
 
@@ -95,5 +105,38 @@ export class AuthController {
       parsed.data.confirmPassword
     );
     res.json({ success: true, data: result });
+  }
+
+  async googleStart(req: Request, res: Response) {
+    const url = authService.getGoogleStartUrl();
+    res.redirect(url);
+  }
+
+  async googleCallback(req: Request, res: Response) {
+    const code = typeof req.query.code === 'string' ? req.query.code : '';
+    const state = typeof req.query.state === 'string' ? req.query.state : '';
+    if (!code || !state) throw new ValidationError('Callback OAuth inválido');
+
+    const result = await authService.loginWithGoogle(
+      code,
+      state,
+      req.ip,
+      req.get('user-agent') || undefined
+    );
+
+    const frontendBase = config.FRONTEND_BASE_URL || 'http://localhost:5173';
+    const codeForFrontend = authService.createGoogleBridgeCode({
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+    });
+    const params = new URLSearchParams({ code: codeForFrontend });
+    res.redirect(`${frontendBase.replace(/\/$/, '')}/auth/google/callback?${params.toString()}`);
+  }
+
+  async googleExchange(req: Request, res: Response) {
+    const parsed = googleExchangeSchema.safeParse(req.body);
+    if (!parsed.success) throw new ValidationError(parsed.error.issues[0]?.message || 'Código OAuth inválido');
+    const tokens = authService.consumeGoogleBridgeCode(parsed.data.code);
+    res.json({ success: true, data: tokens });
   }
 }

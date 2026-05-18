@@ -1,13 +1,17 @@
 import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { TravelTripService } from './trip.service';
-import { assertCatalogAdmin, resolveTenantCompanyId } from '../../common/company-context';
+import { TravelSearchService } from '../../services/travel/travel-search.service';
+import { travelSearchIntentRequestZ } from '../../services/travel/travel-search.schema';
 import { toJsonSafe } from '../../common/jsonSafe';
+import { getRecommendationRunForTenant } from '../../services/recommendation/recommendation-persistence.service';
+import { assertCatalogAdmin, resolveTenantCompanyId } from '../../common/company-context';
 import { TravelTripStatus } from '@prisma/client';
 import prisma from '../../infrastructure/db';
 import { NotFoundError, ValidationError } from '../../common/errors/AppError';
 
 const svc = new TravelTripService();
+const travelSearch = new TravelSearchService();
 
 export class TravelTripController {
   list = async (req: Request, res: Response) => {
@@ -32,6 +36,34 @@ export class TravelTripController {
       q: req.query.q as string,
     });
     return res.json({ success: true, data: { items: data } });
+  };
+
+  /** Búsqueda por intención (motor rec-engine). Body admite persistRun + leadId para auditar runs. */
+  searchIntent = async (req: Request, res: Response) => {
+    if (!req.user) return res.status(401).end();
+    const companyId = resolveTenantCompanyId(req);
+    const parsed = travelSearchIntentRequestZ.safeParse(req.body);
+    if (!parsed.success) {
+      throw new ValidationError(parsed.error.issues[0]?.message || 'Payload inválido');
+    }
+    const { persistRun, telemetryVerbose, leadId, ...intent } = parsed.data;
+    const data = await travelSearch.searchByIntent(companyId, intent, {
+      persistRecommendation: persistRun
+        ? { leadId: leadId ?? undefined, userId: req.user.id }
+        : undefined,
+      telemetryVerbose: telemetryVerbose ?? undefined,
+    });
+    return res.json({ success: true, data });
+  };
+
+  getRecommendationRun = async (req: Request, res: Response) => {
+    if (!req.user) return res.status(401).end();
+    const companyId = resolveTenantCompanyId(req);
+    const run = await getRecommendationRunForTenant(String(req.params.runId), companyId);
+    if (!run) {
+      throw new NotFoundError('Run de recomendación no encontrado');
+    }
+    return res.json({ success: true, data: toJsonSafe(run) });
   };
 
   getOne = async (req: Request, res: Response) => {

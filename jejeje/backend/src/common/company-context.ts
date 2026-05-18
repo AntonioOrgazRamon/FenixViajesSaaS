@@ -2,6 +2,17 @@ import { Request } from 'express';
 import { ForbiddenError, ValidationError } from './errors/AppError';
 
 /**
+ * Paste/import-json: un COMPANY_ADMIN no puede declarar `companyId` de otra empresa en el body.
+ */
+export function assertPasteImportCompanyScope(req: Request, bodyCompanyId?: string): void {
+  if (!req.user) return;
+  const trimmed = typeof bodyCompanyId === 'string' ? bodyCompanyId.trim() : '';
+  if (req.user.role === 'COMPANY_ADMIN' && trimmed && trimmed !== req.user.companyId) {
+    throw new ValidationError('No puedes importar para otra empresa');
+  }
+}
+
+/**
  * Contexto de empresa para recursos multi-tenant.
  * - COMPANY_ADMIN / COMPANY_USER: usan su companyId.
  * - SUPER_ADMIN: debe enviar `companyId` en query o body (nunca asumir una empresa).

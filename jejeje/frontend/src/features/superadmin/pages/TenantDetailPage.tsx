@@ -4,6 +4,7 @@ import { api } from '../../../lib/axios';
 import { unwrap } from '../../../lib/api';
 import type { Company, CompanyAuditRow } from '../../../types/domain';
 import { getApiErrorMessage } from '../../../lib/errors';
+import { confirmAction } from '../../../lib/swal';
 import { PanelCard } from '../../../components/ui/PanelCard';
 import { appPageTitle } from '../../../lib/appTable';
 import { formatDateTime, labelCompanyStatus } from '../../../lib/userDisplayLabels';
@@ -33,12 +34,12 @@ export function TenantDetailPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['company', id] }),
   });
   const remove = useMutation({
-    mutationFn: () => api.delete(`/superadmin/companies/${id}`, { data: { reason: 'Borrado lógico desde panel' } }),
+    mutationFn: () => api.delete(`/superadmin/companies/${id}`, { data: { reason: 'Borrado lï¿½gico desde panel' } }),
     onSuccess: () => navigate('/superadmin/tenants'),
   });
 
   if (!id) return null;
-  if (isLoading) return <p className="text-sm text-zinc-500">Cargando…</p>;
+  if (isLoading) return <p className="text-sm text-zinc-500">Cargando?</p>;
   if (error || !data) return <p className="text-sm text-red-400">Empresa no encontrada.</p>;
 
   const recentAudit = data.recentAudit ?? [];
@@ -83,7 +84,7 @@ export function TenantDetailPage() {
               className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-zinc-200 bg-white/85 px-3 py-1.5 text-xs font-medium text-zinc-800 transition-colors duration-200 hover:bg-zinc-50 dark:border-white/15 dark:bg-white/5 dark:text-zinc-200 dark:hover:bg-white/10"
             >
               <Shield className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" aria-hidden />
-              Auditoría
+              Auditorï¿½a
             </Link>
           </div>
         </div>
@@ -133,11 +134,11 @@ export function TenantDetailPage() {
           </div>
           <dl className="space-y-2 border-t border-zinc-200/80 pt-2.5 dark:border-white/[0.08]">
             <div className="flex items-center justify-between gap-3">
-              <dt className="text-xs text-zinc-500 dark:text-zinc-400">Último usuario creado</dt>
+              <dt className="text-xs text-zinc-500 dark:text-zinc-400">ï¿½ltimo usuario creado</dt>
               <dd className="text-sm text-zinc-900 dark:text-zinc-100">{formatDateTime(data.lastUserCreatedAt, 'Sin registros')}</dd>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <dt className="text-xs text-zinc-500 dark:text-zinc-400">Último lead creado</dt>
+              <dt className="text-xs text-zinc-500 dark:text-zinc-400">ï¿½ltimo lead creado</dt>
               <dd className="text-sm text-zinc-900 dark:text-zinc-100">{formatDateTime(data.lastLeadCreatedAt, 'Sin registros')}</dd>
             </div>
             <div className="flex items-center justify-between gap-3">
@@ -202,7 +203,16 @@ export function TenantDetailPage() {
             <button
               type="button"
               onClick={() => {
-                if (confirm('¿Borrar empresa (lógico) y revocar sesiones?')) remove.mutate();
+                void (async () => {
+                  const ok = await confirmAction({
+                    title: 'Eliminar empresa',
+                    text: 'Se realizarï¿½ borrado lï¿½gico de la empresa y se revocarï¿½n sus sesiones activas.',
+                    confirmText: 'Sï¿½, eliminar',
+                    cancelText: 'Cancelar',
+                    icon: 'warning',
+                  });
+                  if (ok) remove.mutate();
+                })();
               }}
               disabled={remove.isPending}
               className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-red-500/40 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors duration-200 hover:bg-red-500/10 disabled:opacity-50 dark:text-red-300"

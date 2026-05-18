@@ -1,5 +1,5 @@
 import prisma from '../../infrastructure/db';
-import { NotFoundError } from '../../common/errors/AppError';
+import { ForbiddenError, NotFoundError } from '../../common/errors/AppError';
 
 export class SessionService {
   async getSessions(userId: string, currentSessionId: string, page = 1, pageSize = 10) {
@@ -65,9 +65,26 @@ export class SessionService {
     return { message: 'Se cerraron el resto de dispositivos activos.' };
   }
 
-  async revokeUserSessions(targetUserId: string, actorUserId: string, reason?: string) {
-    const targetUser = await prisma.user.findUnique({ where: { id: targetUserId }, select: { id: true } });
+  async revokeUserSessions(
+    targetUserId: string,
+    actorUserId: string,
+    actorRole: string,
+    actorCompanyId: string | null,
+    reason?: string
+  ) {
+    const targetUser = await prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { id: true, companyId: true, role: true },
+    });
     if (!targetUser) throw new NotFoundError('Usuario no encontrado');
+    if (actorRole === 'COMPANY_ADMIN') {
+      if (!actorCompanyId || targetUser.companyId !== actorCompanyId) {
+        throw new ForbiddenError('No puedes revocar sesiones de usuarios de otra empresa');
+      }
+      if (targetUser.role === 'SUPER_ADMIN') {
+        throw new ForbiddenError('No puedes revocar sesiones de un superadmin');
+      }
+    }
 
     await prisma.session.updateMany({
       where: { userId: targetUserId, revokedAt: null },

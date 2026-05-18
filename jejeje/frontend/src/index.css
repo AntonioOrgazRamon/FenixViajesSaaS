@@ -6,7 +6,7 @@
   --color-app-bg: #fafafa;
   --color-app-surface: rgba(255, 255, 255, 0.85);
   --color-app-border: rgba(24, 24, 27, 0.1);
-  --color-app-accent: #f59e0b;
+  --color-app-accent: #06b6d4;
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Syne", ui-serif, Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
@@ -17,7 +17,7 @@ html {
 }
 
 html.dark {
-  --color-app-bg: #09090b;
+  --color-app-bg: #0b0c0f;
   --color-app-surface: rgba(24, 24, 27, 0.72);
   --color-app-border: rgba(255, 255, 255, 0.07);
 }
@@ -41,7 +41,7 @@ html.dark body {
 }
 
 ::selection {
-  background-color: rgba(251, 191, 36, 0.28);
+  background-color: rgba(34, 211, 238, 0.28);
   color: #18181b;
 }
 
@@ -50,7 +50,7 @@ html.dark ::selection {
 }
 
 :focus-visible {
-  outline: 2px solid rgba(251, 191, 36, 0.55);
+  outline: 2px solid rgba(6, 182, 212, 0.55);
   outline-offset: 2px;
 }
 
