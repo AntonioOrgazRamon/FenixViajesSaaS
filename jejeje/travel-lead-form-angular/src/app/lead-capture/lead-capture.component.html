@@ -1,0 +1,219 @@
+<div class="page">
+  <header class="hero">
+    <p class="hero__eyebrow">Viajes a medida</p>
+    <h1 class="hero__title">Cuéntanos tu viaje ideal</h1>
+    <p class="hero__subtitle">
+      Los datos se envían al SaaS como <code>Lead</code> + <code>LeadTravelProfile</code> para alimentar el motor de
+      recomendación. Sin lógica de ranking en el navegador.
+    </p>
+  </header>
+
+  <button type="button" class="btn btn--ghost settings-toggle" (click)="toggleSettings()">
+    {{ settingsOpen ? 'Ocultar' : 'Mostrar' }} configuración API
+  </button>
+
+  @if (settingsOpen) {
+    <section class="card card--settings" aria-label="Configuración">
+      <h2 class="section-title">Conexión</h2>
+      <p class="hint">
+        <code>POST {{ settings.apiBaseUrl }}/leads</code> con <strong>Bearer</strong>. El tenant lo determina el JWT.
+        <code>companyId</code> de referencia: <code>{{ settings.companyIdHint }}</code>
+      </p>
+      <label class="field">
+        <span class="field__label">API base URL</span>
+        <input class="field__input" [(ngModel)]="settingsApiBase" [ngModelOptions]="{ standalone: true }" />
+      </label>
+      <label class="field">
+        <span class="field__label">Bearer token (sin prefijo «Bearer »)</span>
+        <input
+          class="field__input"
+          type="password"
+          autocomplete="off"
+          [(ngModel)]="settingsToken"
+          [ngModelOptions]="{ standalone: true }"
+        />
+      </label>
+      <div class="row">
+        <button type="button" class="btn btn--secondary" (click)="applySettings()">Guardar en este navegador</button>
+        <button type="button" class="btn btn--ghost" (click)="clearToken()">Borrar token</button>
+      </div>
+    </section>
+  }
+
+  <form class="card card--form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <div class="toolbar">
+      <button type="button" class="btn btn--secondary btn--small" (click)="fillExample()">Rellenar ejemplo</button>
+      <button type="button" class="btn btn--ghost btn--small" (click)="clearForm()">Limpiar formulario</button>
+    </div>
+
+    <section class="block">
+      <h2 class="section-title">1. Datos personales</h2>
+      <div class="grid grid--2">
+        <label class="field">
+          <span class="field__label">Nombre <span class="req">*</span></span>
+          <input class="field__input" formControlName="name" autocomplete="name" />
+          @if (fieldInvalid('name')) {
+            <span class="field__err">Obligatorio.</span>
+          }
+        </label>
+        <label class="field">
+          <span class="field__label">Email <span class="req">*</span></span>
+          <input class="field__input" type="email" formControlName="email" autocomplete="email" />
+          @if (fieldInvalid('email')) {
+            <span class="field__err">Email válido obligatorio.</span>
+          }
+        </label>
+        <label class="field field--span2">
+          <span class="field__label">Teléfono</span>
+          <input class="field__input" formControlName="phone" autocomplete="tel" />
+        </label>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2 class="section-title">2. Preferencias del viaje</h2>
+      <div class="grid">
+        <label class="field field--span2">
+          <span class="field__label">Destino (libre) <span class="req">*</span></span>
+          <input class="field__input" formControlName="destination" placeholder="Ej. Asia" />
+          @if (fieldInvalid('destination')) {
+            <span class="field__err">Obligatorio.</span>
+          }
+        </label>
+        <label class="field field--span2">
+          <span class="field__label">Destinos que te llaman la atención (opcional)</span>
+            <input
+            class="field__input"
+            formControlName="preferredDestinationsRaw"
+            placeholder="Separar con comas: Tailandia, Japón"
+          />
+        </label>
+
+        <div class="field field--span2">
+          <span class="field__label">Intereses (chips)</span>
+          <div class="chips" role="group" aria-label="Intereses">
+            @for (chip of activityChips; track chip) {
+              <button
+                type="button"
+                class="chip"
+                [class.chip--active]="chipActive(chip)"
+                (click)="toggleChip(chip)"
+              >
+                {{ chip }}
+              </button>
+            }
+          </div>
+        </div>
+
+        <label class="field field--span2">
+          <span class="field__label">Actividades / hobbies (texto libre)</span>
+          <textarea class="field__input field__textarea" rows="2" formControlName="activities"></textarea>
+        </label>
+
+        <label class="field">
+          <span class="field__label">Tipo de viaje <span class="req">*</span></span>
+          <select class="field__input" formControlName="tripType">
+            @for (opt of tripOptions; track opt.value) {
+              <option [ngValue]="opt.value">{{ opt.label }}</option>
+            }
+          </select>
+        </label>
+        <label class="field">
+          <span class="field__label">Aeropuerto de salida</span>
+          <input class="field__input" formControlName="departureAirport" placeholder="Madrid, Barcelona…" />
+        </label>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2 class="section-title">3. Presupuesto y fechas</h2>
+      <div class="grid grid--2">
+        <label class="field">
+          <span class="field__label">Presupuesto (EUR)</span>
+          <input class="field__input" type="number" min="0" step="1" formControlName="budget" />
+        </label>
+        <label class="field">
+          <span class="field__label">Presupuesto — alcance</span>
+          <select class="field__input" formControlName="budgetType">
+            @for (b of budgetTypeOptions; track b.value) {
+              <option [ngValue]="b.value">{{ b.label }}</option>
+            }
+          </select>
+        </label>
+        <label class="field field--span2">
+          <span class="field__label">Fecha de viaje (texto libre)</span>
+          <input class="field__input" formControlName="travelDate" placeholder="Ej. octubre 2026" />
+        </label>
+        <label class="field">
+          <span class="field__label">Fecha desde (opcional)</span>
+          <input class="field__input" type="date" formControlName="travelDateFrom" />
+        </label>
+        <label class="field">
+          <span class="field__label">Fecha hasta (opcional)</span>
+          <input class="field__input" type="date" formControlName="travelDateTo" />
+        </label>
+        <label class="field field--span2">
+          <span class="field__label">Duración aproximada del viaje (días)</span>
+          <input
+            class="field__input"
+            type="number"
+            min="1"
+            max="365"
+            formControlName="durationDays"
+            placeholder="Ej. 14 días → escribe 14"
+          />
+        </label>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2 class="section-title">4. Envío</h2>
+      <label class="field">
+        <span class="field__label">Notas adicionales</span>
+        <textarea class="field__input field__textarea" rows="3" formControlName="notes"></textarea>
+      </label>
+    </section>
+
+    @if (errorMessage) {
+      <div class="banner banner--error" role="alert">{{ errorMessage }}</div>
+    }
+
+    @if (successLead) {
+      <div class="banner banner--ok">
+        <p><strong>Lead creado correctamente</strong></p>
+        <p>
+          ID: <code>{{ successLead.id }}</code>
+        </p>
+        @if (successLead.travelProfile) {
+          <p class="fine">Incluye <code>LeadTravelProfile</code> en el SaaS.</p>
+        }
+        <div class="row row--wrap">
+          <a class="btn btn--primary" [href]="saasLeadUrl()" target="_blank" rel="noopener noreferrer">
+            Abrir lead en SaaS
+          </a>
+        </div>
+        <p class="fine">
+          Genera la propuesta desde la ficha del lead en el SaaS. Si el alta devolviera <code>proposalId</code> /
+          PDF en el futuro, aparecerían aquí.
+        </p>
+      </div>
+    }
+
+    <div class="actions">
+      <button type="submit" class="btn btn--primary" [disabled]="submitting !== 'idle'">
+        @if (submitting === 'sending') {
+          <span>Enviando…</span>
+        } @else {
+          <span>Enviar solicitud</span>
+        }
+      </button>
+    </div>
+  </form>
+
+  <footer class="foot">
+    <p>
+      Modo debug consola: <code>debugLogPayload</code> en <code>environment.common.ts</code> · Angular solo captura y
+      POSTea
+    </p>
+  </footer>
+</div>

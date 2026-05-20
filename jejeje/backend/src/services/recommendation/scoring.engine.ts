@@ -1,9 +1,17 @@
-import type { TravelSearchIntent, ScoreContribution } from '../travel/travel-search.schema';
+import {
+  intentEffectiveBudgetPerPerson,
+  type TravelSearchIntent,
+  type ScoreContribution,
+} from '../travel/travel-search.schema';
 import type { DestinationPointsGeoOpts, TravelTripSearchRow } from '../travel/travel-search.scoring';
 import { lexicalDestinationPoints, normalizeKey, tokenize, tokenJaccard } from '../travel/travel-search.scoring';
 import { LuxuryLevel, TripPace, type TravelStyleAxis } from '@prisma/client';
 import { luxuryRank } from './policy.util';
-import { SEMANTIC_SIMILARITY_MAX_POINTS } from './constants';
+import {
+  PREFERRED_DESTINATION_BONUS_MAX,
+  PREFERRED_DESTINATION_LEXICAL_FLOOR,
+  SEMANTIC_SIMILARITY_MAX_POINTS,
+} from './constants';
 import { mergeLexicalAndGeoDestinationPoints } from '../geo/geo-destination-score';
 
 const MONTH_NAMES_ES: Record<number, string[]> = {
@@ -210,6 +218,66 @@ function ontologyFactor(
   };
 }
 
+export function bestPreferredDestinationPoints(
+  intent: TravelSearchIntent,
+  trip: TravelTripSearchRow,
+  geoOpts?: DestinationPointsGeoOpts,
+): { bestLabel: string | null; rawPts: number } {
+  const prefs = intent.preferredDestinations?.map((s) => s.trim()).filter(Boolean) ?? [];
+  let bestPts = 0;
+  let bestLabel: string | null = null;
+  for (const p of prefs) {
+    const pts = destinationPoints(p, trip, geoOpts);
+    if (pts > bestPts) {
+      bestPts = pts;
+      bestLabel = p;
+    }
+  }
+  return { bestLabel, rawPts: bestPts };
+}
+
+function explicitPreferredDestinationFactor(
+  intent: TravelSearchIntent,
+  trip: TravelTripSearchRow,
+  geoOpts: DestinationPointsGeoOpts | undefined,
+  dualHardMiss: boolean,
+): { pts: number; max: number; detail: string; customerHint: string; bestLabel: string | null } {
+  const max = PREFERRED_DESTINATION_BONUS_MAX;
+  const { bestLabel, rawPts } = bestPreferredDestinationPoints(intent, trip, geoOpts);
+  if (!intent.preferredDestinations?.length || max <= 0) {
+    return {
+      pts: 0,
+      max: 0,
+      detail: 'Preferencia nominal (sin criterio estructurado)',
+      customerHint: '',
+      bestLabel: null,
+    };
+  }
+  if (rawPts < PREFERRED_DESTINATION_LEXICAL_FLOOR) {
+    return {
+      pts: 0,
+      max,
+      detail: `Preferencia nominal 0/${max} (ningún hit claro sobre lugares citados)`,
+      customerHint:
+        'Ninguno de los destinos nombrados por el cliente aparece con claridad en la ficha de este circuito.',
+      bestLabel,
+    };
+  }
+  let pts = Math.round((rawPts / 30) * max);
+  pts = Math.max(0, Math.min(max, pts));
+  if (dualHardMiss) {
+    pts = Math.round(pts * 0.55);
+  }
+  const labelFrag = bestLabel ? `«${bestLabel}»` : 'un lugar citado';
+  return {
+    pts,
+    max,
+    detail: `Preferencia nominal ${pts}/${max} (${labelFrag}; señal léxico/geo ${rawPts}/30)`,
+    customerHint: `El contenido del viaje refleja ${labelFrag}, que el cliente nombró explícitamente.`,
+    bestLabel,
+  };
+}
+
 export function inferAxesFromKeywords(intent: TravelSearchIntent): TravelStyleAxis[] {
   const raw = [intent.travelType, ...(intent.tags ?? []), ...(intent.preferences ?? [])]
     .filter(Boolean)
@@ -327,10 +395,12 @@ export function scoreTripBreakdown(
     const n = parseFloat(trip.indicativePrice);
     priceNum = Number.isFinite(n) ? n : null;
   }
-  const d3 = budgetFactor(intent.budgetPerPerson, priceNum);
+  const d3 = budgetFactor(intentEffectiveBudgetPerPerson(intent), priceNum);
   const d4 = datesFactor(intent, trip);
   const d5 = keywordFactor(intent, trip);
   const d6 = ontologyFactor(intent, trip);
+  const dualHardMiss = Boolean(d2.max > 0 && d2.miss && d3.max > 0 && d3.miss);
+  const dPref = explicitPreferredDestinationFactor(intent, trip, opts?.geoOpts, dualHardMiss);
 
   const contributions: ScoreContribution[] = [];
   if (d1Max > 0) {
@@ -416,6 +486,17 @@ export function scoreTripBreakdown(
       ),
     );
   }
+  if (dPref.max > 0 && dPref.pts > 0) {
+    contributions.push(
+      toContribution(
+        'explicitPreferredDestination',
+        dPref.pts,
+        dPref.max,
+        dPref.detail,
+        dPref.customerHint,
+      ),
+    );
+  }
 
   const semMaxCfg = opts?.semanticMaxPoints ?? SEMANTIC_SIMILARITY_MAX_POINTS;
   let sem01 = opts?.semanticSimilarity01;
@@ -474,6 +555,10 @@ export function scoreTripBreakdown(
 
   if (d6.max && d6.pts >= d6.max * 0.5) matches.push('Estilo/categorización del catálogo coherente con la intención');
   else if (d6.max && d6.pts < d6.max * 0.25) misses.push('Estilo publicado poco alineado con la intención');
+
+  if (dPref.max > 0 && dPref.pts >= dPref.max * 0.45) {
+    matches.push('Encaje con un destino que el cliente nombró explícitamente');
+  }
 
   const rawSem = opts?.semanticSimilarity01;
   if (rawSem != null && semMaxCfg > 0) {

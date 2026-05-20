@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import type { TravelSearchIntent } from '../../travel/travel-search.schema';
+import { intentEffectiveBudgetPerPerson, type TravelSearchIntent } from '../../travel/travel-search.schema';
 import { inferBudgetTierLabel } from './intent-tier.util';
 
 function monthNameEs(m: number): string | null {
@@ -49,7 +49,10 @@ export function buildIntentEmbeddingQuery(intent: TravelSearchIntent): {
   if (intent.preferences?.length) {
     parts.push(`preferencias: ${intent.preferences.join('; ')}`);
   }
-  const tier = inferBudgetTierLabel(intent.budgetPerPerson);
+  if (intent.departureAirport?.trim()) {
+    parts.push(`salida ${intent.departureAirport.trim()}`);
+  }
+  const tier = inferBudgetTierLabel(intentEffectiveBudgetPerPerson(intent));
   if (tier) {
     parts.push(`presupuesto orientativo (gama) ${tier}`);
   }

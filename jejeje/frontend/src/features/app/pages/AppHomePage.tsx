@@ -32,7 +32,7 @@ export function AppHomePage() {
           <PanelCard className="h-full transition-all hover:border-violet-400/25 hover:shadow-md">
             <div className="flex items-center gap-2 text-violet-700 dark:text-violet-300">
               <Radar className="h-4 w-4" strokeWidth={1.75} />
-              <span className="text-xs font-semibold uppercase tracking-wide">Roadmap</span>
+              <span className="text-xs font-semibold uppercase tracking-wide">Acceso rápido</span>
             </div>
             <p className="mt-2 text-sm font-semibold text-zinc-900 dark:text-white">Motor</p>
             <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">Visión del motor de recomendación y métricas.</p>

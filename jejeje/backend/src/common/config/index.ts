@@ -31,7 +31,22 @@ const envSchema = z.object({
   SMTP_PORT: z.string().default('587'),
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
-  SMTP_SECURE: z.coerce.boolean().default(false),
+  /**
+   * true solo para puerto 465 (TLS directo). En 587 debe ser false (STARTTLS).
+   * No usar z.coerce.boolean(): en .env `SMTP_SECURE=false` es string y `Boolean("false")` === true.
+   */
+  SMTP_SECURE: z
+    .string()
+    .optional()
+    .transform((s) => {
+      if (s === undefined || s === '') return false;
+      const t = s.trim().toLowerCase();
+      return t === '1' || t === 'true' || t === 'yes';
+    }),
+  /** Timeouts SMTP (ms): más bajos = fallo antes en relays lentos; propuesta no debe quedar bloqueada. */
+  SMTP_CONNECTION_TIMEOUT_MS: z.coerce.number().min(2000).max(120_000).default(8000),
+  SMTP_GREETING_TIMEOUT_MS: z.coerce.number().min(2000).max(120_000).default(7000),
+  SMTP_SOCKET_TIMEOUT_MS: z.coerce.number().min(2000).max(180_000).default(14_000),
   DATABASE_URL: z.string(),
   JWT_SECRET: z.string().default('super-secret-key-change-me'),
   JWT_REFRESH_SECRET: z.string().default('super-refresh-secret-key-change-me'),
@@ -116,8 +131,33 @@ const envSchema = z.object({
   TRAVEL_GEO_PREFILTER_MIN_MATCHES: z.coerce.number().min(1).max(500).default(3),
   /** Profundidad máxima BFS ascendente/descendiente al expandir GeoPlace. */
   TRAVEL_GEO_CLOSURE_MAX_DEPTH: z.coerce.number().min(1).max(24).default(14),
+  /**
+   * Si true: no se llama a OpenAI para embeddar la intención en retrieval híbrido (vector=0).
+   * Útil cuando hay cuota 429 o demos sin IA.
+   */
+  TRAVEL_SKIP_INTENT_EMBEDDING: z
+    .string()
+    .optional()
+    .transform((s) => {
+      if (s === undefined || s === '') return false;
+      return s === '1' || s === 'true' || s === 'yes';
+    }),
   /** Máx requests / ventana para endpoints admin de embeddings. */
   TRAVEL_EMBEDDING_ADMIN_RATE_PER_MIN: z.coerce.number().min(1).default(30),
+
+  /** Enriquecimiento visual de viajes (Unsplash / Pexels). Sin claves no se llama a APIs. */
+  TRAVEL_MEDIA_ENABLED: z
+    .string()
+    .optional()
+    .transform((s) => {
+      if (s === undefined || s === '') return true;
+      return s === '1' || s === 'true' || s === 'yes';
+    }),
+  /** unsplash | pexels — principal; el otro se usa como respaldo si hay clave. */
+  TRAVEL_MEDIA_PROVIDER: z.enum(['unsplash', 'pexels']).default('unsplash'),
+  TRAVEL_MEDIA_MAX_IMAGES: z.coerce.number().min(1).max(20).default(5),
+  UNSPLASH_ACCESS_KEY: z.string().optional(),
+  PEXELS_API_KEY: z.string().optional(),
 
   // --- OpenAI: interruptores y límites de gasto (seguridad coste-first) ---
   OPENAI_ENABLED: z

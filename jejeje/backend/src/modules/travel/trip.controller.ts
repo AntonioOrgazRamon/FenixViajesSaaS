@@ -1,6 +1,9 @@
 import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import { z } from 'zod';
+import type { TravelStyleAxis } from '@prisma/client';
 import { TravelTripService } from './trip.service';
+import { TravelLibraryService } from './travel-library.service';
 import { TravelSearchService } from '../../services/travel/travel-search.service';
 import { travelSearchIntentRequestZ } from '../../services/travel/travel-search.schema';
 import { toJsonSafe } from '../../common/jsonSafe';
@@ -9,9 +12,24 @@ import { assertCatalogAdmin, resolveTenantCompanyId } from '../../common/company
 import { TravelTripStatus } from '@prisma/client';
 import prisma from '../../infrastructure/db';
 import { NotFoundError, ValidationError } from '../../common/errors/AppError';
+import { scheduleTravelMediaEnrichment } from '../../services/travel/media/travel-media-enrichment.service';
 
 const svc = new TravelTripService();
 const travelSearch = new TravelSearchService();
+const travelLibrary = new TravelLibraryService();
+
+const travelLibraryQueryZ = z.object({
+  page: z.coerce.number().min(1).optional(),
+  pageSize: z.coerce.number().min(1).max(48).optional(),
+  status: z.enum(['DRAFT', 'PENDING_REVIEW', 'APPROVED', 'REJECTED']).optional(),
+  preset: z.string().optional(),
+  country: z.string().optional(),
+  city: z.string().optional(),
+  style: z.string().optional(),
+  minDays: z.coerce.number().optional(),
+  maxDays: z.coerce.number().optional(),
+  q: z.string().optional(),
+});
 
 export class TravelTripController {
   list = async (req: Request, res: Response) => {
@@ -22,6 +40,42 @@ export class TravelTripController {
     const status = req.query.status as TravelTripStatus | undefined;
     const data = await svc.list(companyId, req.user.role, { page, pageSize, status });
     return res.json({ success: true, data });
+  };
+
+  libraryList = async (req: Request, res: Response) => {
+    if (!req.user) return res.status(401).end();
+    const companyId = resolveTenantCompanyId(req);
+    const parsed = travelLibraryQueryZ.safeParse(req.query);
+    if (!parsed.success) {
+      throw new ValidationError(parsed.error.issues[0]?.message ?? 'Query inválida');
+    }
+    const styleRaw = parsed.data.style?.trim();
+    const style =
+      styleRaw && /^[A-Z][A-Z0-9_]*$/.test(styleRaw) ? (styleRaw as TravelStyleAxis) : undefined;
+    const data = await travelLibrary.list(companyId, { ...parsed.data, style });
+    return res.json({ success: true, data });
+  };
+
+  libraryDetail = async (req: Request, res: Response) => {
+    if (!req.user) return res.status(401).end();
+    const companyId = resolveTenantCompanyId(req);
+    const tripId = String(req.params.tripId);
+    const data = await travelLibrary.detail(companyId, tripId);
+    if (!data) throw new NotFoundError('Viaje no encontrado');
+    return res.json({ success: true, data });
+  };
+
+  enqueueTripMedia = async (req: Request, res: Response) => {
+    assertCatalogAdmin(req);
+    const companyId = resolveTenantCompanyId(req);
+    const id = String(req.params.id);
+    const t = await prisma.travelTrip.findFirst({ where: { id, companyId } });
+    if (!t) throw new NotFoundError('Viaje no encontrado');
+    if (t.status !== 'APPROVED') {
+      throw new ValidationError('Solo se encola enriquecimiento para viajes APPROVED');
+    }
+    scheduleTravelMediaEnrichment(companyId, id);
+    return res.json({ success: true, data: { queued: true } });
   };
 
   search = async (req: Request, res: Response) => {

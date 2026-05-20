@@ -82,6 +82,11 @@ export function mapTripRowDbToSearchRow(t: TripRowDb): TravelTripSearchRow {
 export type SearchIntentOptions = {
   persistRecommendation?: { leadId?: string; userId?: string };
   telemetryVerbose?: boolean;
+  /**
+   * QA/staging: usar planificación geo (+ scoring context) aunque `TRAVEL_GEO_RETRIEVAL_ENABLED=false`,
+   * sin tocar variables de entorno globales.
+   */
+  geoStagingBypass?: boolean;
 };
 
 /**
@@ -107,8 +112,14 @@ export class TravelSearchService {
     let geoScoringContext: DestinationPointsGeoOpts | undefined;
     let nonRelaxedCandidateRows: TravelTripSearchRow[] | undefined;
 
-    if (config.TRAVEL_GEO_RETRIEVAL_ENABLED && intent.destination?.trim()) {
-      const plan = await new TripGeoRetrievalService().plan(companyId, intent.destination);
+    const useGeoGraph =
+      Boolean(intent.destination?.trim()) &&
+      (config.TRAVEL_GEO_RETRIEVAL_ENABLED || opts?.geoStagingBypass === true);
+
+    if (useGeoGraph) {
+      const plan = await new TripGeoRetrievalService().plan(companyId, intent.destination, {
+        bypassFeatureFlag: opts?.geoStagingBypass === true && !config.TRAVEL_GEO_RETRIEVAL_ENABLED,
+      });
       geoScoringContext = plan.scoringContext;
       if (opts?.telemetryVerbose) {
         logger.info({ companyId, geoNotes: plan.notes }, 'travel geo retrieval plan');

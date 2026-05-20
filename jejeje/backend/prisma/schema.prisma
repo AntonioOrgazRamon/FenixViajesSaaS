@@ -236,99 +236,120 @@ enum CommercialSlotKind {
   ALTERNATIVE
 }
 
+/// Presupuesto declarado en perfil de viaje del lead (antes de normalizar a intención de búsqueda).
+enum TravelLeadBudgetType {
+  PER_PERSON
+  TOTAL
+  UNKNOWN
+}
+
+/// Tipo de viaje declarado por negocio / formulario.
+enum TravelLeadTripType {
+  VACATIONAL
+  HONEYMOON
+  GROUP
+  FAMILY
+  BUSINESS
+  OTHER
+  UNKNOWN
+}
+
 model Company {
-  id                String        @id @default(uuid()) @db.Char(36)
-  name              String        @db.VarChar(150)
-  slug              String        @unique @db.VarChar(100)
-  status            CompanyStatus @default(ACTIVE)
-  createdAt         DateTime      @default(now()) @map("created_at")
-  updatedAt         DateTime      @updatedAt @map("updated_at")
-  suspendedAt       DateTime?     @map("suspended_at")
-  deletedAt         DateTime?     @map("deleted_at")
-  createdBy         String?       @map("created_by") @db.Char(36)
-  integrationToken  String?       @unique @map("integration_token") @db.VarChar(64)
+  id                   String        @id @default(uuid()) @db.Char(36)
+  name                 String        @db.VarChar(150)
+  slug                 String        @unique @db.VarChar(100)
+  status               CompanyStatus @default(ACTIVE)
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+  suspendedAt          DateTime?     @map("suspended_at")
+  deletedAt            DateTime?     @map("deleted_at")
+  createdBy            String?       @map("created_by") @db.Char(36)
+  integrationToken     String?       @unique @map("integration_token") @db.VarChar(64)
   /// Políticas de recomendación por tenant (p. ej. proveedores bloqueados, ratios). JSON libre validado en servidor.
-  recommendationPolicy Json?      @map("recommendation_policy")
+  recommendationPolicy Json?         @map("recommendation_policy")
 
-  users             User[]
-  auditLogs         AuditLog[]
-  leads             Lead[]
-  leadDetails       LeadDetail[]
-  leadActivities    LeadActivity[]
-  leadNotes         LeadNote[]
-  leadAgentRuns     LeadAgentRun[]
+  users          User[]
+  auditLogs      AuditLog[]
+  leads              Lead[]
+  leadTravelProfiles LeadTravelProfile[]
+  leadDetails    LeadDetail[]
+  leadActivities LeadActivity[]
+  leadNotes      LeadNote[]
+  leadAgentRuns  LeadAgentRun[]
 
-  travelDocuments   TravelDocument[]
-  travelTrips       TravelTrip[]
-  destinations      Destination[]
-  geoPlaces         GeoPlace[]
-  travelImportJobs  TravelImportJob[]
-  proposals         Proposal[]
-  proposalVersions  ProposalVersion[]
-  proposalTrips     ProposalTrip[]
-  proposalArtifacts ProposalArtifact[]
-  recommendationRuns     RecommendationRun[]
-  recommendationFeedback RecommendationFeedback[]
-  recommendationItems    RecommendationItem[]
-  tripEmbeddings         TravelTripEmbedding[]
-  openAIUsageLogs        OpenAIUsageLog[]
-  openAIUsageBudget      OpenAIUsageBudget?
+  travelDocuments         TravelDocument[]
+  travelTrips             TravelTrip[]
+  destinations            Destination[]
+  geoPlaces               GeoPlace[]
+  travelImportJobs        TravelImportJob[]
+  proposals               Proposal[]
+  proposalVersions        ProposalVersion[]
+  proposalTrips           ProposalTrip[]
+  proposalArtifacts       ProposalArtifact[]
+  recommendationRuns      RecommendationRun[]
+  recommendationFeedback  RecommendationFeedback[]
+  recommendationItems     RecommendationItem[]
+  tripEmbeddings          TravelTripEmbedding[]
+  openAIUsageLogs         OpenAIUsageLog[]
+  openAIUsageBudget       OpenAIUsageBudget?
   travelJsonImportBatches TravelJsonImportBatch[]
   travelJsonImportItems   TravelJsonImportItem[]
+  travelMediaAssets       TravelMediaAsset[]
+  travelMediaJobs         TravelMediaJob[]
 
   @@index([status])
   @@map("companies")
 }
 
 model User {
-  id                  String        @id @default(uuid()) @db.Char(36)
-  companyId           String?       @map("company_id") @db.Char(36)
-  email               String        @unique @db.VarChar(255)
-  passwordHash        String        @map("password_hash")
-  role                Role
-  status              UserStatus    @default(ACTIVE)
-  firstName           String        @map("first_name")
-  lastName            String        @map("last_name")
-  phone               String?
+  id                    String          @id @default(uuid()) @db.Char(36)
+  companyId             String?         @map("company_id") @db.Char(36)
+  email                 String          @unique @db.VarChar(255)
+  passwordHash          String          @map("password_hash")
+  role                  Role
+  status                UserStatus      @default(ACTIVE)
+  firstName             String          @map("first_name")
+  lastName              String          @map("last_name")
+  phone                 String?
   /// Nombre visible (UI); opcional. Si null, se puede derivar de nombre + apellidos.
-  displayName         String?       @map("display_name") @db.VarChar(150)
-  locale              String?
-  timezone            String?
+  displayName           String?         @map("display_name") @db.VarChar(150)
+  locale                String?
+  timezone              String?
   /// Preferencia de reloj: "24h" | "12h"
-  timeFormat          String?       @map("time_format") @db.VarChar(8)
+  timeFormat            String?         @map("time_format") @db.VarChar(8)
   /// Estilo de fecha: "dmy" | "mdy" | "ymd" | "locale"
-  dateFormat          String?       @map("date_format") @db.VarChar(16)
-  avatarUrl           String?          @map("avatar_url") @db.VarChar(500)
-  avatarType          UserAvatarType   @default(DEFAULT) @map("avatar_type")
-  avatarBackgroundColor String?        @map("avatar_background_color") @db.VarChar(7)
-  avatarTextColor       String?        @map("avatar_text_color") @db.VarChar(7)
-  avatarInitials        String?        @map("avatar_initials") @db.VarChar(3)
+  dateFormat            String?         @map("date_format") @db.VarChar(16)
+  avatarUrl             String?         @map("avatar_url") @db.VarChar(500)
+  avatarType            UserAvatarType  @default(DEFAULT) @map("avatar_type")
+  avatarBackgroundColor String?         @map("avatar_background_color") @db.VarChar(7)
+  avatarTextColor       String?         @map("avatar_text_color") @db.VarChar(7)
+  avatarInitials        String?         @map("avatar_initials") @db.VarChar(3)
   avatarShape           UserAvatarShape @default(CIRCLE) @map("avatar_shape")
-  theme               Theme         @default(SYSTEM)
+  theme                 Theme           @default(SYSTEM)
   /// Preferencias de cuenta (notificaciones, etc.) en JSON; null = defaults en servidor.
-  profilePreferences  Json?        @map("profile_preferences")
-  googleId            String?       @unique @map("google_id") @db.VarChar(255)
-  authProvider        AuthProvider  @default(LOCAL) @map("auth_provider")
-  failedLoginAttempts Int           @default(0) @map("failed_login_attempts")
-  lockedUntil         DateTime?     @map("locked_until")
-  lastLoginAt         DateTime?     @map("last_login_at")
-  createdAt           DateTime      @default(now()) @map("created_at")
-  updatedAt           DateTime      @updatedAt @map("updated_at")
+  profilePreferences    Json?           @map("profile_preferences")
+  googleId              String?         @unique @map("google_id") @db.VarChar(255)
+  authProvider          AuthProvider    @default(LOCAL) @map("auth_provider")
+  failedLoginAttempts   Int             @default(0) @map("failed_login_attempts")
+  lockedUntil           DateTime?       @map("locked_until")
+  lastLoginAt           DateTime?       @map("last_login_at")
+  createdAt             DateTime        @default(now()) @map("created_at")
+  updatedAt             DateTime        @updatedAt @map("updated_at")
 
-  company             Company?      @relation(fields: [companyId], references: [id])
-  sessions            Session[]
-  resetTokens         PasswordResetToken[]
-  auditLogs                 AuditLog[]        @relation("ActorLogs")
+  company                   Company?                @relation(fields: [companyId], references: [id])
+  sessions                  Session[]
+  resetTokens               PasswordResetToken[]
+  auditLogs                 AuditLog[]              @relation("ActorLogs")
   uploadedTravelJsonBatches TravelJsonImportBatch[] @relation("TravelJsonImportUploadedBy")
-  assignedLeads             Lead[]            @relation("LeadAssigned")
-  createdLeads              Lead[]            @relation("LeadCreated")
+  assignedLeads             Lead[]                  @relation("LeadAssigned")
+  createdLeads              Lead[]                  @relation("LeadCreated")
   leadActivities            LeadActivity[]
   leadNotes                 LeadNote[]
-  proposalsCreated          Proposal[]        @relation("ProposalCreatedBy")
-  proposalsAssigned         Proposal[]        @relation("ProposalAssigned")
-  proposalVersionsCreated   ProposalVersion[] @relation("ProposalVersionCreatedBy")
-  recommendationRunsCreated RecommendationRun[] @relation("RecommendationRunCreatedBy")
-  openAIUsageLogs              OpenAIUsageLog[]
+  proposalsCreated          Proposal[]              @relation("ProposalCreatedBy")
+  proposalsAssigned         Proposal[]              @relation("ProposalAssigned")
+  proposalVersionsCreated   ProposalVersion[]       @relation("ProposalVersionCreatedBy")
+  recommendationRunsCreated RecommendationRun[]     @relation("RecommendationRunCreatedBy")
+  openAIUsageLogs           OpenAIUsageLog[]
 
   @@index([companyId, role, status])
   @@index([companyId, status])
@@ -349,7 +370,7 @@ model Session {
   revokedAt        DateTime? @map("revoked_at")
   revokedReason    String?   @map("revoked_reason")
 
-  user             User      @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id])
 
   @@index([userId, revokedAt, expiresAt])
   @@index([companyId, revokedAt])
@@ -368,7 +389,7 @@ model PasswordResetToken {
   requestedIp String?   @map("requested_ip") @db.VarChar(64)
   userAgent   String?   @map("user_agent") @db.VarChar(500)
 
-  user        User      @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id])
 
   @@index([userId, usedAt, expiresAt])
   @@index([expiresAt])
@@ -391,8 +412,8 @@ model AuditLog {
   metadata        Json?
   createdAt       DateTime @default(now()) @map("created_at")
 
-  company         Company? @relation(fields: [companyId], references: [id])
-  actorUser       User?    @relation("ActorLogs", fields: [actorUserId], references: [id])
+  company   Company? @relation(fields: [companyId], references: [id])
+  actorUser User?    @relation("ActorLogs", fields: [actorUserId], references: [id])
 
   @@index([companyId, createdAt])
   @@index([actorUserId, createdAt])
@@ -401,39 +422,40 @@ model AuditLog {
 }
 
 model Lead {
-  id                 String        @id @default(uuid()) @db.Char(36)
-  companyId          String        @map("company_id") @db.Char(36)
-  source             LeadSource
-  sourceDetail       String?       @map("source_detail") @db.VarChar(150)
-  status             LeadStatus    @default(NEW)
-  priority           LeadPriority?
-  firstName          String?       @map("first_name") @db.VarChar(120)
-  lastName           String?       @map("last_name") @db.VarChar(120)
-  fullName           String?       @map("full_name") @db.VarChar(255)
-  email              String?       @db.VarChar(255)
-  phone              String?       @db.VarChar(50)
-  companyName        String?       @map("company_name") @db.VarChar(180)
-  country            String?       @db.VarChar(80)
-  language           LeadLanguage?
-  timezone           String?       @db.VarChar(100)
-  message            String?       @db.Text
-  rawPayload         Json?         @map("raw_payload")
-  normalizedPayload  Json?         @map("normalized_payload")
-  leadScore          Int?          @map("lead_score")
-  assignedUserId     String?       @map("assigned_user_id") @db.Char(36)
-  createdByUserId    String?       @map("created_by_user_id") @db.Char(36)
-  lastAgentRunAt     DateTime?     @map("last_agent_run_at")
-  lastContactedAt    DateTime?     @map("last_contacted_at")
-  convertedAt        DateTime?     @map("converted_at")
-  lostAt             DateTime?     @map("lost_at")
-  createdAt          DateTime      @default(now()) @map("created_at")
-  updatedAt          DateTime      @updatedAt @map("updated_at")
-  deletedAt          DateTime?     @map("deleted_at")
+  id                String        @id @default(uuid()) @db.Char(36)
+  companyId         String        @map("company_id") @db.Char(36)
+  source            LeadSource
+  sourceDetail      String?       @map("source_detail") @db.VarChar(150)
+  status            LeadStatus    @default(NEW)
+  priority          LeadPriority?
+  firstName         String?       @map("first_name") @db.VarChar(120)
+  lastName          String?       @map("last_name") @db.VarChar(120)
+  fullName          String?       @map("full_name") @db.VarChar(255)
+  email             String?       @db.VarChar(255)
+  phone             String?       @db.VarChar(50)
+  companyName       String?       @map("company_name") @db.VarChar(180)
+  country           String?       @db.VarChar(80)
+  language          LeadLanguage?
+  timezone          String?       @db.VarChar(100)
+  message           String?       @db.Text
+  rawPayload        Json?         @map("raw_payload")
+  normalizedPayload Json?         @map("normalized_payload")
+  leadScore         Int?          @map("lead_score")
+  assignedUserId    String?       @map("assigned_user_id") @db.Char(36)
+  createdByUserId   String?       @map("created_by_user_id") @db.Char(36)
+  lastAgentRunAt    DateTime?     @map("last_agent_run_at")
+  lastContactedAt   DateTime?     @map("last_contacted_at")
+  convertedAt       DateTime?     @map("converted_at")
+  lostAt            DateTime?     @map("lost_at")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+  deletedAt         DateTime?     @map("deleted_at")
 
-  company            Company       @relation(fields: [companyId], references: [id])
-  assignedUser       User?         @relation("LeadAssigned", fields: [assignedUserId], references: [id])
-  createdByUser      User?         @relation("LeadCreated", fields: [createdByUserId], references: [id])
+  company            Company             @relation(fields: [companyId], references: [id])
+  assignedUser       User?               @relation("LeadAssigned", fields: [assignedUserId], references: [id])
+  createdByUser      User?               @relation("LeadCreated", fields: [createdByUserId], references: [id])
   details            LeadDetail?
+  travelProfile      LeadTravelProfile?
   activities         LeadActivity[]
   notes              LeadNote[]
   agentRuns          LeadAgentRun[]
@@ -446,6 +468,37 @@ model Lead {
   @@index([companyId, email])
   @@index([companyId, phone])
   @@map("leads")
+}
+
+model LeadTravelProfile {
+  id                   String               @id @default(uuid()) @db.Char(36)
+  companyId            String               @map("company_id") @db.Char(36)
+  leadId               String               @unique @map("lead_id") @db.Char(36)
+  destinationText      String?              @map("destination_text") @db.VarChar(500)
+  preferredDestinations Json?               @map("preferred_destinations")
+  activitiesText       String?              @map("activities_text") @db.Text
+  activityTags         Json?                @map("activity_tags")
+  travelDateText       String?              @map("travel_date_text") @db.VarChar(500)
+  travelDateFrom       DateTime?            @map("travel_date_from")
+  travelDateTo         DateTime?            @map("travel_date_to")
+  flexibleDates        Boolean?             @map("flexible_dates")
+  /** Duración orientativa en días (captación estructurada). */
+  durationDays         Int?                 @map("duration_days")
+  budgetAmount         Decimal?             @map("budget_amount") @db.Decimal(14, 2)
+  budgetCurrency       String               @default("EUR") @map("budget_currency") @db.VarChar(8)
+  budgetType           TravelLeadBudgetType @default(UNKNOWN) @map("budget_type")
+  tripType             TravelLeadTripType   @default(UNKNOWN) @map("trip_type")
+  departureAirportText  String?             @map("departure_airport_text") @db.VarChar(200)
+  departureAirportCode  String?             @map("departure_airport_code") @db.VarChar(12)
+  rawFormPayload       Json?                @map("raw_form_payload")
+  createdAt            DateTime             @default(now()) @map("created_at")
+  updatedAt            DateTime             @updatedAt @map("updated_at")
+
+  lead    Lead    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@index([companyId, leadId])
+  @@map("lead_travel_profiles")
 }
 
 model LeadDetail {
@@ -463,28 +516,28 @@ model LeadDetail {
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 
-  lead               Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  company            Company  @relation(fields: [companyId], references: [id])
+  lead    Lead    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id])
 
   @@index([companyId, leadId])
   @@map("lead_details")
 }
 
 model LeadActivity {
-  id            String           @id @default(uuid()) @db.Char(36)
-  companyId     String           @map("company_id") @db.Char(36)
-  leadId        String           @map("lead_id") @db.Char(36)
-  actorUserId   String?          @map("actor_user_id") @db.Char(36)
-  actorType     LeadActorType    @map("actor_type")
-  activityType  LeadActivityType @map("activity_type")
-  title         String           @db.VarChar(160)
-  description   String?          @db.Text
-  metadata      Json?
-  createdAt     DateTime         @default(now()) @map("created_at")
+  id           String           @id @default(uuid()) @db.Char(36)
+  companyId    String           @map("company_id") @db.Char(36)
+  leadId       String           @map("lead_id") @db.Char(36)
+  actorUserId  String?          @map("actor_user_id") @db.Char(36)
+  actorType    LeadActorType    @map("actor_type")
+  activityType LeadActivityType @map("activity_type")
+  title        String           @db.VarChar(160)
+  description  String?          @db.Text
+  metadata     Json?
+  createdAt    DateTime         @default(now()) @map("created_at")
 
-  company       Company          @relation(fields: [companyId], references: [id])
-  lead          Lead             @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  actorUser     User?            @relation(fields: [actorUserId], references: [id])
+  company   Company @relation(fields: [companyId], references: [id])
+  lead      Lead    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  actorUser User?   @relation(fields: [actorUserId], references: [id])
 
   @@index([companyId, leadId, createdAt])
   @@index([companyId, activityType, createdAt])
@@ -492,18 +545,18 @@ model LeadActivity {
 }
 
 model LeadNote {
-  id            String    @id @default(uuid()) @db.Char(36)
-  companyId     String    @map("company_id") @db.Char(36)
-  leadId        String    @map("lead_id") @db.Char(36)
-  authorUserId  String    @map("author_user_id") @db.Char(36)
-  content       String    @db.Text
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-  deletedAt     DateTime? @map("deleted_at")
+  id           String    @id @default(uuid()) @db.Char(36)
+  companyId    String    @map("company_id") @db.Char(36)
+  leadId       String    @map("lead_id") @db.Char(36)
+  authorUserId String    @map("author_user_id") @db.Char(36)
+  content      String    @db.Text
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
 
-  company       Company   @relation(fields: [companyId], references: [id])
-  lead          Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  author        User      @relation(fields: [authorUserId], references: [id])
+  company Company @relation(fields: [companyId], references: [id])
+  lead    Lead    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  author  User    @relation(fields: [authorUserId], references: [id])
 
   @@index([companyId, leadId, createdAt])
   @@map("lead_notes")
@@ -523,8 +576,8 @@ model LeadAgentRun {
   finishedAt    DateTime?            @map("finished_at")
   createdAt     DateTime             @default(now()) @map("created_at")
 
-  company       Company              @relation(fields: [companyId], references: [id])
-  lead          Lead                 @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id])
+  lead    Lead    @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
   @@index([companyId, leadId, createdAt])
   @@map("lead_agent_runs")
@@ -546,6 +599,20 @@ enum TravelTripStatus {
   PENDING_REVIEW
   APPROVED
   REJECTED
+}
+
+/// Fotos de catálogo vía Unsplash/Pexels (URLs + metadatos; sin binarios).
+enum TravelMediaSourceProvider {
+  UNSPLASH
+  PEXELS
+}
+
+enum TravelMediaJobStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  PARTIAL
+  FAILED
 }
 
 enum DestinationKind {
@@ -613,73 +680,75 @@ enum TravelJsonImportItemValidationStatus {
 }
 
 model TravelDocument {
-  id                 String               @id @default(uuid()) @db.Char(36)
-  companyId          String               @map("company_id") @db.Char(36)
-  filename           String               @db.VarChar(255)
-  originalName       String               @map("original_name") @db.VarChar(500)
-  mimeType           String               @map("mime_type") @db.VarChar(120)
-  size               Int
-  storagePath        String               @map("storage_path") @db.VarChar(1000)
-  status             TravelDocumentStatus @default(UPLOADED)
-  totalPages         Int?                 @map("total_pages")
-  extractedTextPath  String?              @map("extracted_text_path") @db.VarChar(1000)
-  errorMessage       String?              @map("error_message") @db.Text
-  createdAt          DateTime             @default(now()) @map("created_at")
-  updatedAt          DateTime             @updatedAt @map("updated_at")
+  id                String               @id @default(uuid()) @db.Char(36)
+  companyId         String               @map("company_id") @db.Char(36)
+  filename          String               @db.VarChar(255)
+  originalName      String               @map("original_name") @db.VarChar(500)
+  mimeType          String               @map("mime_type") @db.VarChar(120)
+  size              Int
+  storagePath       String               @map("storage_path") @db.VarChar(1000)
+  status            TravelDocumentStatus @default(UPLOADED)
+  totalPages        Int?                 @map("total_pages")
+  extractedTextPath String?              @map("extracted_text_path") @db.VarChar(1000)
+  errorMessage      String?              @map("error_message") @db.Text
+  createdAt         DateTime             @default(now()) @map("created_at")
+  updatedAt         DateTime             @updatedAt @map("updated_at")
 
-  company            Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  trips              TravelTrip[]
-  importJobs         TravelImportJob[]
+  company    Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  trips      TravelTrip[]
+  importJobs TravelImportJob[]
 
   @@index([companyId, status, createdAt])
   @@map("travel_documents")
 }
 
 model TravelTrip {
-  id                 String            @id @default(uuid()) @db.Char(36)
-  companyId          String            @map("company_id") @db.Char(36)
-  documentId         String?           @map("document_id") @db.Char(36)
+  id                String                @id @default(uuid()) @db.Char(36)
+  companyId         String                @map("company_id") @db.Char(36)
+  documentId        String?               @map("document_id") @db.Char(36)
   /// Slug estable por tenant para deduplicar importaciones JSON (no confundir con URL pública).
-  importSlug         String?           @map("import_slug") @db.VarChar(200)
-  title              String            @db.VarChar(500)
-  provider           String?           @db.VarChar(255)
-  season             String?           @db.VarChar(120)
-  mainDestination    String?           @map("main_destination") @db.VarChar(300)
-  description        String?           @db.Text
-  durationDays       Int?              @map("duration_days")
-  durationNights     Int?              @map("duration_nights")
-  indicativePrice    Decimal?          @map("indicative_price") @db.Decimal(12, 2)
-  currency           String?           @db.VarChar(3)
-  status             TravelTripStatus  @default(PENDING_REVIEW)
-  confidenceScore    Float?            @map("confidence_score")
-  sourcePageStart    Int?              @map("source_page_start")
-  sourcePageEnd      Int?              @map("source_page_end")
-  rawExtractedText   String?           @map("raw_extracted_text") @db.LongText
-  luxuryLevel        LuxuryLevel       @default(UNKNOWN) @map("luxury_level")
-  budgetTier         TripBudgetTier    @default(UNKNOWN) @map("budget_tier")
-  pace               TripPace          @default(UNKNOWN)
-  climatePreference  TripClimatePreference @default(UNKNOWN) @map("climate_preference")
-  exclusivity        TripExclusivity    @default(UNKNOWN)
+  importSlug        String?               @map("import_slug") @db.VarChar(200)
+  title             String                @db.VarChar(500)
+  provider          String?               @db.VarChar(255)
+  season            String?               @db.VarChar(120)
+  mainDestination   String?               @map("main_destination") @db.VarChar(300)
+  description       String?               @db.Text
+  durationDays      Int?                  @map("duration_days")
+  durationNights    Int?                  @map("duration_nights")
+  indicativePrice   Decimal?              @map("indicative_price") @db.Decimal(12, 2)
+  currency          String?               @db.VarChar(3)
+  status            TravelTripStatus      @default(PENDING_REVIEW)
+  confidenceScore   Float?                @map("confidence_score")
+  sourcePageStart   Int?                  @map("source_page_start")
+  sourcePageEnd     Int?                  @map("source_page_end")
+  rawExtractedText  String?               @map("raw_extracted_text") @db.LongText
+  luxuryLevel       LuxuryLevel           @default(UNKNOWN) @map("luxury_level")
+  budgetTier        TripBudgetTier        @default(UNKNOWN) @map("budget_tier")
+  pace              TripPace              @default(UNKNOWN)
+  climatePreference TripClimatePreference @default(UNKNOWN) @map("climate_preference")
+  exclusivity       TripExclusivity       @default(UNKNOWN)
   /// Reservado Fase 2: clave de namespace para vectores / features precomputados.
-  embeddingKey       String?           @map("embedding_key") @db.VarChar(120)
-  createdAt          DateTime          @default(now()) @map("created_at")
-  updatedAt          DateTime          @updatedAt @map("updated_at")
+  embeddingKey      String?               @map("embedding_key") @db.VarChar(120)
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
 
-  company            Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  document           TravelDocument?   @relation(fields: [documentId], references: [id], onDelete: SetNull)
-  tripDestinations   TravelTripDestination[]
-  itineraryDays      TripItineraryDay[]
-  services           TripCatalogService[]
-  departures         TripDeparture[]
-  hotels             TripHotel[]
-  highlights         TripHighlight[]
-  observations       TripObservation[]
-  proposalTrips      ProposalTrip[]
-  styleTags          TravelTripStyleTag[]
+  company             Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  document            TravelDocument?         @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  tripDestinations    TravelTripDestination[]
+  itineraryDays       TripItineraryDay[]
+  services            TripCatalogService[]
+  departures          TripDeparture[]
+  hotels              TripHotel[]
+  highlights          TripHighlight[]
+  observations        TripObservation[]
+  proposalTrips       ProposalTrip[]
+  styleTags           TravelTripStyleTag[]
   recommendationItems RecommendationItem[]
-  embeddings         TravelTripEmbedding[]
-  tripGeoPlaces      TripGeoPlace[]
-  jsonImportItems    TravelJsonImportItem[]
+  embeddings          TravelTripEmbedding[]
+  tripGeoPlaces       TripGeoPlace[]
+  jsonImportItems     TravelJsonImportItem[]
+  mediaAssets         TravelMediaAsset[]
+  mediaJobs           TravelMediaJob[]
 
   @@unique([companyId, importSlug])
   @@index([companyId, status, createdAt])
@@ -688,21 +757,76 @@ model TravelTrip {
   @@map("travel_trips")
 }
 
-model TravelJsonImportBatch {
-  id               String                     @id @default(uuid()) @db.Char(36)
-  companyId        String                     @map("company_id") @db.Char(36)
-  uploadedByUserId String                     @map("uploaded_by_user_id") @db.Char(36)
-  fileName         String                     @map("file_name") @db.VarChar(500)
-  status           TravelJsonImportBatchStatus
-  totalItems       Int                        @map("total_items")
-  validItems       Int                        @map("valid_items")
-  invalidItems     Int                        @map("invalid_items")
-  createdAt        DateTime                   @default(now()) @map("created_at")
-  updatedAt        DateTime                   @updatedAt @map("updated_at")
+model TravelMediaAsset {
+  id               String                    @id @default(uuid()) @db.Char(36)
+  companyId        String                    @map("company_id") @db.Char(36)
+  tripId           String                    @map("trip_id") @db.Char(36)
+  sourceProvider   TravelMediaSourceProvider @map("source_provider")
+  queryUsed        String                    @map("query_used") @db.VarChar(500)
+  imageUrl         String                    @map("image_url") @db.VarChar(2048)
+  thumbnailUrl     String?                   @map("thumbnail_url") @db.VarChar(2048)
+  width            Int?
+  height           Int?
+  photographerName String?                   @map("photographer_name") @db.VarChar(200)
+  photographerUrl  String?                   @map("photographer_url") @db.VarChar(500)
+  providerAssetId  String                    @map("provider_asset_id") @db.VarChar(120)
+  locationHint     String?                   @map("location_hint") @db.VarChar(500)
+  tags             Json?
+  isPrimary        Boolean                   @default(false) @map("is_primary")
+  orderIndex       Int                       @default(0) @map("order_index")
+  metadataJson     Json?                     @map("metadata_json")
+  createdAt        DateTime                  @default(now()) @map("created_at")
+  updatedAt        DateTime                  @updatedAt @map("updated_at")
 
-  company       Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  uploadedBy    User    @relation("TravelJsonImportUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: Cascade)
-  items         TravelJsonImportItem[]
+  company Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  trip    TravelTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, tripId, sourceProvider, providerAssetId])
+  @@index([tripId])
+  @@index([companyId])
+  @@index([providerAssetId])
+  @@index([isPrimary])
+  @@map("travel_media_assets")
+}
+
+model TravelMediaJob {
+  id            String               @id @default(uuid()) @db.Char(36)
+  companyId     String               @map("company_id") @db.Char(36)
+  tripId        String               @map("trip_id") @db.Char(36)
+  status        TravelMediaJobStatus
+  startedAt     DateTime?            @map("started_at")
+  finishedAt    DateTime?            @map("finished_at")
+  errorMessage  String?              @map("error_message") @db.Text
+  querySummary  String?              @map("query_summary") @db.VarChar(2000)
+  providerUsed  String?              @map("provider_used") @db.VarChar(40)
+  assetsCreated Int                  @default(0) @map("assets_created")
+  metadataJson  Json?                @map("metadata_json")
+  createdAt     DateTime             @default(now()) @map("created_at")
+  updatedAt     DateTime             @updatedAt @map("updated_at")
+
+  company Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  trip    TravelTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, tripId])
+  @@index([status])
+  @@map("travel_media_jobs")
+}
+
+model TravelJsonImportBatch {
+  id               String                      @id @default(uuid()) @db.Char(36)
+  companyId        String                      @map("company_id") @db.Char(36)
+  uploadedByUserId String                      @map("uploaded_by_user_id") @db.Char(36)
+  fileName         String                      @map("file_name") @db.VarChar(500)
+  status           TravelJsonImportBatchStatus
+  totalItems       Int                         @map("total_items")
+  validItems       Int                         @map("valid_items")
+  invalidItems     Int                         @map("invalid_items")
+  createdAt        DateTime                    @default(now()) @map("created_at")
+  updatedAt        DateTime                    @updatedAt @map("updated_at")
+
+  company    Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  uploadedBy User                   @relation("TravelJsonImportUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: Cascade)
+  items      TravelJsonImportItem[]
 
   @@index([companyId, createdAt])
   @@index([companyId, status])
@@ -710,21 +834,21 @@ model TravelJsonImportBatch {
 }
 
 model TravelJsonImportItem {
-  id                 String                             @id @default(uuid()) @db.Char(36)
-  batchId            String                             @map("batch_id") @db.Char(36)
-  companyId          String                             @map("company_id") @db.Char(36)
-  sourceJson         Json                               @map("source_json")
-  normalizedJson     Json                               @map("normalized_json")
+  id                 String                               @id @default(uuid()) @db.Char(36)
+  batchId            String                               @map("batch_id") @db.Char(36)
+  companyId          String                               @map("company_id") @db.Char(36)
+  sourceJson         Json                                 @map("source_json")
+  normalizedJson     Json                                 @map("normalized_json")
   validationStatus   TravelJsonImportItemValidationStatus @map("validation_status")
-  validationErrors   Json                               @map("validation_errors")
-  validationWarnings Json                               @map("validation_warnings")
-  importedTripId     String?                            @map("imported_trip_id") @db.Char(36)
-  createdAt          DateTime                           @default(now()) @map("created_at")
-  updatedAt          DateTime                           @updatedAt @map("updated_at")
+  validationErrors   Json                                 @map("validation_errors")
+  validationWarnings Json                                 @map("validation_warnings")
+  importedTripId     String?                              @map("imported_trip_id") @db.Char(36)
+  createdAt          DateTime                             @default(now()) @map("created_at")
+  updatedAt          DateTime                             @updatedAt @map("updated_at")
 
-  batch         TravelJsonImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  company       Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  importedTrip  TravelTrip?         @relation(fields: [importedTripId], references: [id], onDelete: SetNull)
+  batch        TravelJsonImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  company      Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  importedTrip TravelTrip?           @relation(fields: [importedTripId], references: [id], onDelete: SetNull)
 
   @@index([batchId, validationStatus])
   @@index([companyId, batchId])
@@ -733,23 +857,23 @@ model TravelJsonImportItem {
 
 /// Vector / texto embebido para retrieval híbrido (Fase 2). Multi-modelo por viaje.
 model TravelTripEmbedding {
-  id          String   @id @default(uuid()) @db.Char(36)
-  companyId   String   @map("company_id") @db.Char(36)
-  tripId      String   @map("trip_id") @db.Char(36)
-  model       String   @db.VarChar(80)
-  dims        Int
+  id               String   @id @default(uuid()) @db.Char(36)
+  companyId        String   @map("company_id") @db.Char(36)
+  tripId           String   @map("trip_id") @db.Char(36)
+  model            String   @db.VarChar(80)
+  dims             Int
   /// Vector denso almacenado como JSON array de floats (MySQL sin pgvector).
-  vector      Json
+  vector           Json
   /// Referencia futura Qdrant/Pinecone.
-  externalVectorId String? @map("external_vector_id") @db.VarChar(200)
-  contentHash String   @map("content_hash") @db.VarChar(64)
-  content     String   @db.Text
-  metadata    Json
-  profileVersion Int   @default(1) @map("profile_version")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  externalVectorId String?  @map("external_vector_id") @db.VarChar(200)
+  contentHash      String   @map("content_hash") @db.VarChar(64)
+  content          String   @db.Text
+  metadata         Json
+  profileVersion   Int      @default(1) @map("profile_version")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
   trip    TravelTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
 
   @@unique([companyId, tripId, model])
@@ -759,7 +883,7 @@ model TravelTripEmbedding {
 }
 
 model TravelTripStyleTag {
-  tripId String         @map("trip_id") @db.Char(36)
+  tripId String          @map("trip_id") @db.Char(36)
   style  TravelStyleAxis
 
   trip TravelTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
@@ -770,16 +894,16 @@ model TravelTripStyleTag {
 }
 
 model Destination {
-  id                String            @id @default(uuid()) @db.Char(36)
-  companyId         String            @map("company_id") @db.Char(36)
-  name              String            @db.VarChar(255)
-  type              DestinationKind
-  normalizedName    String            @map("normalized_name") @db.VarChar(255)
-  createdAt         DateTime          @default(now()) @map("created_at")
-  updatedAt         DateTime          @updatedAt @map("updated_at")
+  id             String          @id @default(uuid()) @db.Char(36)
+  companyId      String          @map("company_id") @db.Char(36)
+  name           String          @db.VarChar(255)
+  type           DestinationKind
+  normalizedName String          @map("normalized_name") @db.VarChar(255)
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
 
-  company           Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  tripDestinations  TravelTripDestination[]
+  company          Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  tripDestinations TravelTripDestination[]
 
   @@unique([companyId, normalizedName, type])
   @@index([companyId, normalizedName])
@@ -787,12 +911,12 @@ model Destination {
 }
 
 model TravelTripDestination {
-  tripId         String       @map("trip_id") @db.Char(36)
-  destinationId  String       @map("destination_id") @db.Char(36)
-  orderIndex     Int          @default(0) @map("order_index")
+  tripId        String @map("trip_id") @db.Char(36)
+  destinationId String @map("destination_id") @db.Char(36)
+  orderIndex    Int    @default(0) @map("order_index")
 
-  trip           TravelTrip   @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  destination    Destination  @relation(fields: [destinationId], references: [id], onDelete: Cascade)
+  trip        TravelTrip  @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  destination Destination @relation(fields: [destinationId], references: [id], onDelete: Cascade)
 
   @@id([tripId, destinationId])
   @@index([destinationId])
@@ -801,22 +925,22 @@ model TravelTripDestination {
 
 /// Lugar geográfico jerárquico por empresa (`companyId` obligatorio = multi-tenant seguro).
 model GeoPlace {
-  id              String        @id @default(uuid()) @db.Char(36)
-  companyId       String        @map("company_id") @db.Char(36)
-  kind            GeoPlaceKind
-  canonicalName   String        @map("canonical_name") @db.VarChar(255)
-  normalizedKey   String        @map("normalized_key") @db.VarChar(255)
-  parentId        String?       @map("parent_id") @db.Char(36)
-  externalRef     String?       @map("external_ref") @db.VarChar(120)
+  id                  String       @id @default(uuid()) @db.Char(36)
+  companyId           String       @map("company_id") @db.Char(36)
+  kind                GeoPlaceKind
+  canonicalName       String       @map("canonical_name") @db.VarChar(255)
+  normalizedKey       String       @map("normalized_key") @db.VarChar(255)
+  parentId            String?      @map("parent_id") @db.Char(36)
+  externalRef         String?      @map("external_ref") @db.VarChar(120)
   /// Traza opcional al Destination legacy que originó este nodo en backfill.
-  legacyDestinationId String?   @unique @map("legacy_destination_id") @db.Char(36)
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
+  legacyDestinationId String?      @unique @map("legacy_destination_id") @db.Char(36)
+  createdAt           DateTime     @default(now()) @map("created_at")
+  updatedAt           DateTime     @updatedAt @map("updated_at")
 
-  company         Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  parent          GeoPlace?     @relation("GeoPlaceHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
-  children        GeoPlace[]    @relation("GeoPlaceHierarchy")
-  tripGeoPlaces   TripGeoPlace[]
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  parent        GeoPlace?      @relation("GeoPlaceHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children      GeoPlace[]     @relation("GeoPlaceHierarchy")
+  tripGeoPlaces TripGeoPlace[]
 
   @@unique([companyId, normalizedKey, kind])
   @@index([companyId, normalizedKey])
@@ -827,16 +951,16 @@ model GeoPlace {
 
 /// Enlace viaje ↔ lugar geográfico (dual-read con TravelTripDestination durante la transición).
 model TripGeoPlace {
-  tripId      String            @map("trip_id") @db.Char(36)
-  geoPlaceId  String            @map("geo_place_id") @db.Char(36)
-  role        TripGeoPlaceRole
-  orderIndex  Int               @default(0) @map("order_index")
-  confidence  Float?
-  source      TripGeoPlaceSource
-  createdAt   DateTime          @default(now()) @map("created_at")
+  tripId     String             @map("trip_id") @db.Char(36)
+  geoPlaceId String             @map("geo_place_id") @db.Char(36)
+  role       TripGeoPlaceRole
+  orderIndex Int                @default(0) @map("order_index")
+  confidence Float?
+  source     TripGeoPlaceSource
+  createdAt  DateTime           @default(now()) @map("created_at")
 
-  trip        TravelTrip        @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  geoPlace    GeoPlace          @relation(fields: [geoPlaceId], references: [id], onDelete: Cascade)
+  trip     TravelTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  geoPlace GeoPlace   @relation(fields: [geoPlaceId], references: [id], onDelete: Cascade)
 
   @@id([tripId, geoPlaceId])
   @@index([tripId])
@@ -845,114 +969,114 @@ model TripGeoPlace {
 }
 
 model TripItineraryDay {
-  id             String     @id @default(uuid()) @db.Char(36)
-  tripId         String     @map("trip_id") @db.Char(36)
-  dayNumber      Int        @map("day_number")
-  title          String?    @db.VarChar(500)
-  description    String?    @db.Text
-  meals          String?    @db.Text
-  accommodation  String?    @db.Text
-  orderIndex     Int        @default(0) @map("order_index")
-  createdAt      DateTime   @default(now()) @map("created_at")
-  updatedAt      DateTime   @updatedAt @map("updated_at")
+  id            String   @id @default(uuid()) @db.Char(36)
+  tripId        String   @map("trip_id") @db.Char(36)
+  dayNumber     Int      @map("day_number")
+  title         String?  @db.VarChar(500)
+  description   String?  @db.Text
+  meals         String?  @db.Text
+  accommodation String?  @db.Text
+  orderIndex    Int      @default(0) @map("order_index")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
-  trip           TravelTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  trip TravelTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
 
   @@index([tripId, dayNumber])
   @@map("trip_itinerary_days")
 }
 
 model TripCatalogService {
-  id        String          @id @default(uuid()) @db.Char(36)
-  tripId    String          @map("trip_id") @db.Char(36)
-  type      TripServiceKind
-  text      String          @db.Text
-  orderIndex Int            @default(0) @map("order_index")
-  createdAt DateTime       @default(now()) @map("created_at")
-  updatedAt DateTime       @updatedAt @map("updated_at")
+  id         String          @id @default(uuid()) @db.Char(36)
+  tripId     String          @map("trip_id") @db.Char(36)
+  type       TripServiceKind
+  text       String          @db.Text
+  orderIndex Int             @default(0) @map("order_index")
+  createdAt  DateTime        @default(now()) @map("created_at")
+  updatedAt  DateTime        @updatedAt @map("updated_at")
 
-  trip      TravelTrip      @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  trip TravelTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
 
   @@index([tripId, type])
   @@map("trip_catalog_services")
 }
 
 model TripDeparture {
-  id            String     @id @default(uuid()) @db.Char(36)
-  tripId        String     @map("trip_id") @db.Char(36)
-  departureText String     @map("departure_text") @db.Text
-  startDate     DateTime?  @map("start_date") @db.Date
-  endDate       DateTime?  @map("end_date") @db.Date
-  weekdays      String?    @db.VarChar(100)
-  orderIndex    Int        @default(0) @map("order_index")
-  createdAt     DateTime   @default(now()) @map("created_at")
-  updatedAt     DateTime   @updatedAt @map("updated_at")
+  id            String    @id @default(uuid()) @db.Char(36)
+  tripId        String    @map("trip_id") @db.Char(36)
+  departureText String    @map("departure_text") @db.Text
+  startDate     DateTime? @map("start_date") @db.Date
+  endDate       DateTime? @map("end_date") @db.Date
+  weekdays      String?   @db.VarChar(100)
+  orderIndex    Int       @default(0) @map("order_index")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  trip          TravelTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  trip TravelTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
 
   @@index([tripId])
   @@map("trip_departures")
 }
 
 model TripHotel {
-  id         String     @id @default(uuid()) @db.Char(36)
-  tripId     String     @map("trip_id") @db.Char(36)
-  category   String?    @db.VarChar(50)
-  city       String?    @db.VarChar(150)
-  hotelName  String?    @map("hotel_name") @db.VarChar(255)
-  orderIndex Int        @default(0) @map("order_index")
-  createdAt  DateTime   @default(now()) @map("created_at")
-  updatedAt  DateTime   @updatedAt @map("updated_at")
+  id         String   @id @default(uuid()) @db.Char(36)
+  tripId     String   @map("trip_id") @db.Char(36)
+  category   String?  @db.VarChar(50)
+  city       String?  @db.VarChar(150)
+  hotelName  String?  @map("hotel_name") @db.VarChar(255)
+  orderIndex Int      @default(0) @map("order_index")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
-  trip       TravelTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  trip TravelTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
 
   @@index([tripId])
   @@map("trip_hotels")
 }
 
 model TripHighlight {
-  id         String     @id @default(uuid()) @db.Char(36)
-  tripId     String     @map("trip_id") @db.Char(36)
-  text       String     @db.Text
-  orderIndex Int        @default(0) @map("order_index")
-  createdAt  DateTime   @default(now()) @map("created_at")
-  updatedAt  DateTime   @updatedAt @map("updated_at")
+  id         String   @id @default(uuid()) @db.Char(36)
+  tripId     String   @map("trip_id") @db.Char(36)
+  text       String   @db.Text
+  orderIndex Int      @default(0) @map("order_index")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
-  trip       TravelTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  trip TravelTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
 
   @@index([tripId])
   @@map("trip_highlights")
 }
 
 model TripObservation {
-  id         String     @id @default(uuid()) @db.Char(36)
-  tripId     String     @map("trip_id") @db.Char(36)
-  text       String     @db.Text
-  orderIndex Int        @default(0) @map("order_index")
-  createdAt  DateTime   @default(now()) @map("created_at")
-  updatedAt  DateTime   @updatedAt @map("updated_at")
+  id         String   @id @default(uuid()) @db.Char(36)
+  tripId     String   @map("trip_id") @db.Char(36)
+  text       String   @db.Text
+  orderIndex Int      @default(0) @map("order_index")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
-  trip       TravelTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  trip TravelTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
 
   @@index([tripId])
   @@map("trip_observations")
 }
 
 model TravelImportJob {
-  id             String                @id @default(uuid()) @db.Char(36)
-  companyId      String                @map("company_id") @db.Char(36)
-  documentId     String?               @map("document_id") @db.Char(36)
-  status         TravelImportJobStatus @default(PENDING)
-  currentStep    String?               @map("current_step") @db.VarChar(200)
-  progress       Int                   @default(0)
-  errorMessage   String?               @map("error_message") @db.Text
-  startedAt      DateTime?             @map("started_at")
-  finishedAt     DateTime?             @map("finished_at")
-  createdAt      DateTime              @default(now()) @map("created_at")
-  updatedAt      DateTime              @updatedAt @map("updated_at")
+  id           String                @id @default(uuid()) @db.Char(36)
+  companyId    String                @map("company_id") @db.Char(36)
+  documentId   String?               @map("document_id") @db.Char(36)
+  status       TravelImportJobStatus @default(PENDING)
+  currentStep  String?               @map("current_step") @db.VarChar(200)
+  progress     Int                   @default(0)
+  errorMessage String?               @map("error_message") @db.Text
+  startedAt    DateTime?             @map("started_at")
+  finishedAt   DateTime?             @map("finished_at")
+  createdAt    DateTime              @default(now()) @map("created_at")
+  updatedAt    DateTime              @updatedAt @map("updated_at")
 
-  company        Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  document       TravelDocument?       @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  company  Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  document TravelDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)
 
   @@index([companyId, documentId, createdAt])
   @@index([status, createdAt])
@@ -960,27 +1084,27 @@ model TravelImportJob {
 }
 
 model RecommendationRun {
-  id                   String                   @id @default(uuid()) @db.Char(36)
-  companyId            String                   @map("company_id") @db.Char(36)
-  leadId               String?                  @map("lead_id") @db.Char(36)
-  createdByUserId      String?                  @map("created_by_user_id") @db.Char(36)
-  intentSnapshot       Json                     @map("intent_snapshot")
-  scoringModelVersion  String                   @map("scoring_model_version") @db.VarChar(64)
-  matchState           RecommendationMatchState @map("match_state")
-  globalConfidence     Float?                   @map("global_confidence")
-  validationSummary    Json?                   @map("validation_summary")
-  fallbackHints        Json?                   @map("fallback_hints")
-  telemetry            Json?
-  catalogCandidateCount Int                    @map("catalog_candidate_count")
+  id                    String                   @id @default(uuid()) @db.Char(36)
+  companyId             String                   @map("company_id") @db.Char(36)
+  leadId                String?                  @map("lead_id") @db.Char(36)
+  createdByUserId       String?                  @map("created_by_user_id") @db.Char(36)
+  intentSnapshot        Json                     @map("intent_snapshot")
+  scoringModelVersion   String                   @map("scoring_model_version") @db.VarChar(64)
+  matchState            RecommendationMatchState @map("match_state")
+  globalConfidence      Float?                   @map("global_confidence")
+  validationSummary     Json?                    @map("validation_summary")
+  fallbackHints         Json?                    @map("fallback_hints")
+  telemetry             Json?
+  catalogCandidateCount Int                      @map("catalog_candidate_count")
   /// Stats de retrieval híbrido (Fase 2): pesos, pool, advertencias.
-  retrievalSummary     Json?                  @map("retrieval_summary")
+  retrievalSummary      Json?                    @map("retrieval_summary")
   /// Fase 2: namespace de embeddings / chunking.
-  embeddingNamespace   String?                @map("embedding_namespace") @db.VarChar(120)
-  createdAt            DateTime              @default(now()) @map("created_at")
+  embeddingNamespace    String?                  @map("embedding_namespace") @db.VarChar(120)
+  createdAt             DateTime                 @default(now()) @map("created_at")
 
-  company       Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  lead          Lead?                @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  createdByUser User?                @relation("RecommendationRunCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  company       Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead          Lead?                    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  createdByUser User?                    @relation("RecommendationRunCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
   items         RecommendationItem[]
   feedback      RecommendationFeedback[]
 
@@ -1002,9 +1126,9 @@ model RecommendationItem {
   diversityPenalty Float?                   @map("diversity_penalty")
   explainability   Json?
 
-  company   Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  run       RecommendationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
-  travelTrip TravelTrip       @relation(fields: [travelTripId], references: [id], onDelete: Restrict)
+  company    Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  run        RecommendationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  travelTrip TravelTrip        @relation(fields: [travelTripId], references: [id], onDelete: Restrict)
 
   @@index([companyId, runId])
   @@index([runId, rankIndex])
@@ -1012,13 +1136,13 @@ model RecommendationItem {
 }
 
 model RecommendationFeedback {
-  id          String   @id @default(uuid()) @db.Char(36)
-  companyId   String   @map("company_id") @db.Char(36)
-  runId       String   @map("run_id") @db.Char(36)
-  rating      Int?
-  helpful     Boolean?
-  comment     String?  @db.Text
-  createdAt   DateTime @default(now()) @map("created_at")
+  id        String   @id @default(uuid()) @db.Char(36)
+  companyId String   @map("company_id") @db.Char(36)
+  runId     String   @map("run_id") @db.Char(36)
+  rating    Int?
+  helpful   Boolean?
+  comment   String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
 
   company Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
   run     RecommendationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
@@ -1041,11 +1165,11 @@ model Proposal {
   createdAt       DateTime       @default(now()) @map("created_at")
   updatedAt       DateTime       @updatedAt @map("updated_at")
 
-  company         Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  lead            Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  createdByUser   User?          @relation("ProposalCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
-  assignedUser    User?          @relation("ProposalAssigned", fields: [assignedUserId], references: [id], onDelete: SetNull)
-  versions        ProposalVersion[]
+  company       Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead          Lead              @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  createdByUser User?             @relation("ProposalCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  assignedUser  User?             @relation("ProposalAssigned", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  versions      ProposalVersion[]
 
   @@index([companyId, leadId, createdAt])
   @@index([companyId, status, updatedAt])
@@ -1066,11 +1190,11 @@ model ProposalVersion {
   createdByUserId String?  @map("created_by_user_id") @db.Char(36)
   createdAt       DateTime @default(now()) @map("created_at")
 
-  company         Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  proposal        Proposal          @relation(fields: [proposalId], references: [id], onDelete: Cascade)
-  createdByUser   User?             @relation("ProposalVersionCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
-  trips           ProposalTrip[]
-  artifacts       ProposalArtifact[]
+  company       Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  proposal      Proposal           @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  createdByUser User?              @relation("ProposalVersionCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  trips         ProposalTrip[]
+  artifacts     ProposalArtifact[]
 
   @@unique([proposalId, versionNumber])
   @@index([companyId, proposalId])
@@ -1089,9 +1213,9 @@ model ProposalTrip {
   reasons           Json?
   createdAt         DateTime @default(now()) @map("created_at")
 
-  company           Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  proposalVersion   ProposalVersion @relation(fields: [proposalVersionId], references: [id], onDelete: Cascade)
-  travelTrip        TravelTrip      @relation(fields: [travelTripId], references: [id], onDelete: Restrict)
+  company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  proposalVersion ProposalVersion @relation(fields: [proposalVersionId], references: [id], onDelete: Cascade)
+  travelTrip      TravelTrip      @relation(fields: [travelTripId], references: [id], onDelete: Restrict)
 
   @@unique([proposalVersionId, travelTripId])
   @@index([companyId, proposalVersionId])
@@ -1111,8 +1235,8 @@ model ProposalArtifact {
   metadata          Json?
   createdAt         DateTime             @default(now()) @map("created_at")
 
-  company           Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  proposalVersion   ProposalVersion @relation(fields: [proposalVersionId], references: [id], onDelete: Cascade)
+  company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  proposalVersion ProposalVersion @relation(fields: [proposalVersionId], references: [id], onDelete: Cascade)
 
   @@index([companyId, proposalVersionId])
   @@index([companyId, kind])
@@ -1139,21 +1263,21 @@ enum OpenAIUsageLogStatus {
 }
 
 model OpenAIUsageLog {
-  id             String                @id @default(uuid()) @db.Char(36)
-  companyId      String                @map("company_id") @db.Char(36)
-  userId         String?               @map("user_id") @db.Char(36)
-  operationType  OpenAIOperationType   @map("operation_type")
-  model          String                @db.VarChar(80)
-  inputTokens    Int                   @default(0) @map("input_tokens")
-  outputTokens   Int                   @default(0) @map("output_tokens")
-  totalTokens    Int                   @default(0) @map("total_tokens")
-  estimatedCost  Decimal?              @map("estimated_cost") @db.Decimal(14, 6)
-  requestId      String?               @map("request_id") @db.VarChar(120)
-  status         OpenAIUsageLogStatus
-  errorCode      String?               @map("error_code") @db.VarChar(64)
-  durationMs     Int?                  @map("duration_ms")
-  metadata       Json?
-  createdAt      DateTime              @default(now()) @map("created_at")
+  id            String               @id @default(uuid()) @db.Char(36)
+  companyId     String               @map("company_id") @db.Char(36)
+  userId        String?              @map("user_id") @db.Char(36)
+  operationType OpenAIOperationType  @map("operation_type")
+  model         String               @db.VarChar(80)
+  inputTokens   Int                  @default(0) @map("input_tokens")
+  outputTokens  Int                  @default(0) @map("output_tokens")
+  totalTokens   Int                  @default(0) @map("total_tokens")
+  estimatedCost Decimal?             @map("estimated_cost") @db.Decimal(14, 6)
+  requestId     String?              @map("request_id") @db.VarChar(120)
+  status        OpenAIUsageLogStatus
+  errorCode     String?              @map("error_code") @db.VarChar(64)
+  durationMs    Int?                 @map("duration_ms")
+  metadata      Json?
+  createdAt     DateTime             @default(now()) @map("created_at")
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -1166,17 +1290,17 @@ model OpenAIUsageLog {
 }
 
 model OpenAIUsageBudget {
-  id                    String    @id @default(uuid()) @db.Char(36)
-  companyId             String    @unique @map("company_id") @db.Char(36)
-  dailyLimitEuros       Decimal?  @map("daily_limit_euros") @db.Decimal(14, 6)
-  monthlyLimitEuros     Decimal?  @map("monthly_limit_euros") @db.Decimal(14, 6)
-  maxCallsPerHour       Int?      @map("max_calls_per_hour")
-  maxTokensPerRequest   Int?      @map("max_tokens_per_request")
-  userDailyLimitEuros   Decimal?  @map("user_daily_limit_euros") @db.Decimal(14, 6)
-  isEnabled             Boolean   @default(true) @map("is_enabled")
-  hardBlocked           Boolean   @default(false) @map("hard_blocked")
-  createdAt             DateTime  @default(now()) @map("created_at")
-  updatedAt             DateTime  @updatedAt @map("updated_at")
+  id                  String   @id @default(uuid()) @db.Char(36)
+  companyId           String   @unique @map("company_id") @db.Char(36)
+  dailyLimitEuros     Decimal? @map("daily_limit_euros") @db.Decimal(14, 6)
+  monthlyLimitEuros   Decimal? @map("monthly_limit_euros") @db.Decimal(14, 6)
+  maxCallsPerHour     Int?     @map("max_calls_per_hour")
+  maxTokensPerRequest Int?     @map("max_tokens_per_request")
+  userDailyLimitEuros Decimal? @map("user_daily_limit_euros") @db.Decimal(14, 6)
+  isEnabled           Boolean  @default(true) @map("is_enabled")
+  hardBlocked         Boolean  @default(false) @map("hard_blocked")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 

@@ -1,11 +1,13 @@
 import { Request, Response } from 'express';
 import { LeadService } from './lead.service';
 import {
+  createLeadBodySchema,
   createNoteSchema,
   listLeadsQuerySchema,
   patchLeadDetailsSchema,
   patchLeadSchema,
   patchNoteSchema,
+  patchTravelProfileSchema,
   runAgentsSchema,
 } from './lead.schema';
 import { ValidationError } from '../../common/errors/AppError';
@@ -13,6 +15,36 @@ import { ValidationError } from '../../common/errors/AppError';
 const leadService = new LeadService();
 
 export class LeadController {
+  async create(req: Request, res: Response) {
+    const parsed = createLeadBodySchema.safeParse(req.body);
+    if (!parsed.success) throw new ValidationError(parsed.error.issues[0]?.message ?? 'Body inválido');
+    const companyId = req.user!.companyId!;
+    const user = req.user!;
+    const lead = await leadService.createFromCrm(companyId, parsed.data, user.id, user.role);
+    res.status(201).json({ success: true, data: lead });
+  }
+
+  async getTravelProfile(req: Request, res: Response) {
+    const companyId = req.user!.companyId!;
+    const data = await leadService.getTravelProfile(companyId, req.params.leadId as string);
+    res.json({ success: true, data });
+  }
+
+  async patchTravelProfile(req: Request, res: Response) {
+    const parsed = patchTravelProfileSchema.safeParse(req.body);
+    if (!parsed.success) throw new ValidationError(parsed.error.issues[0]?.message ?? 'Body inválido');
+    const companyId = req.user!.companyId!;
+    const user = req.user!;
+    const data = await leadService.patchTravelProfile(
+      companyId,
+      req.params.leadId as string,
+      parsed.data,
+      user.id,
+      user.role,
+    );
+    res.json({ success: true, data });
+  }
+
   async list(req: Request, res: Response) {
     const parsed = listLeadsQuerySchema.safeParse(req.query);
     if (!parsed.success) throw new ValidationError(parsed.error.issues[0]?.message ?? 'Query inválida');

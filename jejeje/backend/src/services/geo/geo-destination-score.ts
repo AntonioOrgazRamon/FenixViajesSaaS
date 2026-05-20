@@ -52,13 +52,13 @@ function geoDeltaFromLinks(
     else if (hitExpanded) parts.push('jerarquía geo (descendiente/ascendente)');
     else if (hitViaAncestor) parts.push('relación geo por ancestros');
     return {
-      delta: Math.min(14, best),
+      delta: Math.min(11, Math.round(best * 0.85)),
       note: parts.length ? `geo: ${parts.join('; ')}` : '',
     };
   }
 
   return {
-    delta: -11,
+    delta: -8,
     note: 'geo: sin relación con la intención (TripGeoPlace)',
   };
 }

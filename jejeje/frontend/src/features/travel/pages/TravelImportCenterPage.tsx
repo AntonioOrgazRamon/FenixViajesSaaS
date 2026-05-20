@@ -10,6 +10,7 @@ import {
   FileJson,
   History,
   Loader2,
+  Sparkles,
   Trash2,
   Upload,
   XCircle,
@@ -19,6 +20,7 @@ import { unwrap } from '../../../lib/api';
 import { useAuthStore } from '../../../store/authStore';
 import type { Company, Paginated } from '../../../types/domain';
 import { cn } from '../../../lib/cn';
+import { useDemoPresentationMode } from '../../../lib/demoPresentationMode';
 import { confirmAction, notifyError, notifySuccess } from '../../../lib/swal';
 
 type ImportItem = {
@@ -99,6 +101,58 @@ function getNormalizedMetadata(n: Record<string, unknown>): Record<string, unkno
   return {};
 }
 
+function summarizeImportBatchHealth(items: ImportItem[]): {
+  total: number;
+  invalid: number;
+  warningSignals: number;
+  uniqueDestinations: number;
+  qualityPct: number;
+  verdict: string;
+} | null {
+  if (!items.length) return null;
+  let invalid = 0;
+  let warningSignals = 0;
+  const dest = new Set<string>();
+  for (const it of items) {
+    if (it.validationStatus === 'INVALID') invalid++;
+    warningSignals += parseStringList(it.validationWarnings).length;
+    const trip = getNormalizedTrip(it.normalizedJson);
+    const md = trip.mainDestination;
+    if (typeof md === 'string' && md.trim()) dest.add(md.trim());
+  }
+  const validShare = (items.length - invalid) / items.length;
+  const qualityPct = Math.max(0, Math.min(100, Math.round(validShare * 100 - Math.min(25, warningSignals * 2))));
+  const verdict =
+    validShare >= 0.92 && warningSignals <= items.length
+      ? 'Este lote parece suficientemente completo para seguir hacia revisión y aprobación.'
+      : validShare >= 0.75
+        ? 'Calidad mixta: conviene corregir alertas antes de importar en bloque.'
+        : 'Priorice ítems inválidos antes de una demo o importación masiva.';
+  return {
+    total: items.length,
+    invalid,
+    warningSignals,
+    uniqueDestinations: dest.size,
+    qualityPct,
+    verdict,
+  };
+}
+
+function BatchPreviewSkeleton() {
+  return (
+    <div className="animate-pulse space-y-5 rounded-2xl border border-zinc-200/90 bg-white/90 p-6 dark:border-zinc-800 dark:bg-zinc-950/80">
+      <div className="flex flex-wrap gap-3">
+        <div className="h-9 flex-1 rounded-xl bg-zinc-100 dark:bg-zinc-800" />
+        <div className="h-9 w-28 rounded-xl bg-zinc-100 dark:bg-zinc-800" />
+        <div className="h-9 w-28 rounded-xl bg-zinc-100 dark:bg-zinc-800" />
+      </div>
+      <div className="h-24 rounded-xl bg-zinc-100 dark:bg-zinc-800" />
+      <div className="h-24 rounded-xl bg-zinc-100 dark:bg-zinc-800" />
+      <div className="h-24 rounded-xl bg-zinc-100 dark:bg-zinc-800" />
+    </div>
+  );
+}
+
 /** Alineado con backend `TRAVEL_JSON_IMPORT_MAX_MB` por defecto (documentación). */
 const TRAVEL_JSON_IMPORT_MAX_MB_UI = 8;
 
@@ -160,6 +214,13 @@ export function TravelImportCenterPage() {
     },
     enabled: !!activeBatchId && canQuery,
   });
+
+  const demoMode = useDemoPresentationMode();
+
+  const importHealth = useMemo(
+    () => summarizeImportBatchHealth(batchDetailQ.data?.items ?? []),
+    [batchDetailQ.data?.items],
+  );
 
   const uploadM = useMutation({
     mutationFn: async (file: File) => {
@@ -347,12 +408,19 @@ export function TravelImportCenterPage() {
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-600 dark:text-cyan-400">
               Catálogo · staging
             </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 md:text-3xl">
+            <h1 className="mt-1 flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 md:text-3xl">
               Travel Import Center
+              {demoMode ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/15 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-violet-800 ring-1 ring-violet-500/25 dark:text-violet-100 dark:ring-violet-400/30">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Demo
+                </span>
+              ) : null}
             </h1>
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
-              Sube un JSON revisado, evalúa la calidad por viaje, corrige en contexto e importa solo cuando estés conforme.
-              Nada se escribe en el catálogo hasta que confirmes la importación.
+              {demoMode
+                ? 'Vista pulida para reuniones: validación clara, foco en calidad del lote y siguiente paso.'
+                : 'Sube un JSON revisado, evalúa la calidad por viaje, corrige en contexto e importa solo cuando estés conforme. Nada se escribe en el catálogo hasta que confirmes la importación.'}
             </p>
           </div>
 
@@ -416,6 +484,12 @@ export function TravelImportCenterPage() {
                 </button>
               </div>
 
+              {(uploadM.isPending || pasteM.isPending) && (
+                <div className="border-t border-zinc-200/90 bg-gradient-to-r from-cyan-500/[0.07] to-indigo-500/[0.06] px-4 py-2.5 text-center text-xs font-medium text-cyan-950 dark:border-zinc-800 dark:text-cyan-50">
+                  Validando estructura · revisando campos clave · preparando vista previa…
+                </div>
+              )}
+
               {inputTab === 'file' ? (
                 <div
                   onDragOver={(e) => e.preventDefault()}
@@ -429,11 +503,17 @@ export function TravelImportCenterPage() {
                     </div>
                     <p className="mt-4 text-base font-medium text-zinc-900 dark:text-zinc-100">Arrastra tu JSON aquí</p>
                     <p className="mt-1 max-w-md text-sm text-zinc-500 dark:text-zinc-400">
-                      Formato oficial: cada elemento es{' '}
-                      <code className="rounded bg-zinc-100 px-1 py-0.5 text-[11px] dark:bg-zinc-900">source</code> +{' '}
-                      <code className="rounded bg-zinc-100 px-1 py-0.5 text-[11px] dark:bg-zinc-900">trip</code> +{' '}
-                      <code className="rounded bg-zinc-100 px-1 py-0.5 text-[11px] dark:bg-zinc-900">metadata</code>{' '}
-                      (array o un solo objeto). Planos legados siguen admitidos.
+                      {demoMode ? (
+                        <>Arrastra un JSON en formato admitido por el importador enriquecido.</>
+                      ) : (
+                        <>
+                          Formato oficial: cada elemento es{' '}
+                          <code className="rounded bg-zinc-100 px-1 py-0.5 text-[11px] dark:bg-zinc-900">source</code> +{' '}
+                          <code className="rounded bg-zinc-100 px-1 py-0.5 text-[11px] dark:bg-zinc-900">trip</code> +{' '}
+                          <code className="rounded bg-zinc-100 px-1 py-0.5 text-[11px] dark:bg-zinc-900">metadata</code>{' '}
+                          (array o un solo objeto). Planos legados siguen admitidos.
+                        </>
+                      )}
                     </p>
                     <input
                       ref={fileRef}
@@ -467,12 +547,17 @@ export function TravelImportCenterPage() {
                 </div>
               ) : (
                 <div className="space-y-4 p-5">
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                  <p className={cn('text-sm text-zinc-600 dark:text-zinc-400', demoMode && 'sr-only')}>
                     Pega un <strong className="font-medium text-zinc-800 dark:text-zinc-200">array</strong> de ítems{' '}
                     <code className="rounded bg-zinc-100 px-1 py-0.5 text-[11px] dark:bg-zinc-900">{'{ source, trip, metadata }'}</code>{' '}
                     o un único objeto enriquecido. Los datos de catálogo van dentro de{' '}
                     <code className="rounded bg-zinc-100 px-1 py-0.5 text-[11px] dark:bg-zinc-900">trip</code>.
                   </p>
+                  {demoMode ? (
+                    <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                      Pega el JSON del catálogo; el sistema validará en segundos y mostrará alertas accionables.
+                    </p>
+                  ) : null}
                   <textarea
                     value={pasteText}
                     onChange={(e) => {
@@ -562,6 +647,36 @@ export function TravelImportCenterPage() {
                   </div>
                 </div>
 
+                {importHealth ? (
+                  <div className="mt-5 rounded-2xl border border-teal-200/80 bg-gradient-to-br from-teal-500/[0.06] to-cyan-500/[0.05] p-4 dark:border-teal-900/40 dark:from-teal-500/10 dark:to-cyan-500/5">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-900 dark:text-teal-100">
+                      Import Health Summary
+                    </p>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      <div className="rounded-xl bg-white/80 px-3 py-2 shadow-sm dark:bg-zinc-950/60">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Calidad estimada</p>
+                        <p className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">{importHealth.qualityPct}%</p>
+                      </div>
+                      <div className="rounded-xl bg-white/80 px-3 py-2 shadow-sm dark:bg-zinc-950/60">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Alertas (aprox.)</p>
+                        <p className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">{importHealth.warningSignals}</p>
+                      </div>
+                      <div className="rounded-xl bg-white/80 px-3 py-2 shadow-sm dark:bg-zinc-950/60">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Destinos únicos</p>
+                        <p className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">{importHealth.uniqueDestinations}</p>
+                      </div>
+                      <div className="rounded-xl bg-white/80 px-3 py-2 shadow-sm dark:bg-zinc-950/60">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Inválidos</p>
+                        <p className="text-lg font-semibold text-rose-700 dark:text-rose-300">{importHealth.invalid}</p>
+                      </div>
+                    </div>
+                    <p className="mt-3 text-sm leading-relaxed text-teal-950 dark:text-teal-50">
+                      <span className="font-semibold text-teal-900 dark:text-teal-100">Recomendación del sistema:</span>{' '}
+                      {importHealth.verdict}
+                    </p>
+                  </div>
+                ) : null}
+
                 <div className="mt-6 space-y-3">
                   {batchDetailQ.data.items.map((item) => (
                     <TripPreviewCard
@@ -620,9 +735,7 @@ export function TravelImportCenterPage() {
                 </div>
               </div>
             ) : activeBatchId && batchDetailQ.isLoading ? (
-              <div className="flex items-center justify-center rounded-2xl border border-zinc-200 bg-white p-12 dark:border-zinc-800 dark:bg-zinc-950">
-                <Loader2 className="h-8 w-8 animate-spin text-cyan-600" />
-              </div>
+              <BatchPreviewSkeleton />
             ) : (
               <EmptyPreview />
             )}
@@ -634,7 +747,13 @@ export function TravelImportCenterPage() {
               Historial de lotes
             </div>
             <div className="space-y-2">
-              {(batchesQ.data?.items ?? []).length === 0 ? (
+              {batchesQ.isPending ? (
+                <div className="animate-pulse space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-16 rounded-xl bg-zinc-100 dark:bg-zinc-900" />
+                  ))}
+                </div>
+              ) : (batchesQ.data?.items ?? []).length === 0 ? (
                 <p className="rounded-xl border border-zinc-200/90 bg-white/80 px-4 py-6 text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-950/70 dark:text-zinc-400">
                   Aún no hay importaciones JSON en staging para esta empresa.
                 </p>

@@ -1,4 +1,4 @@
-import type { TravelSearchIntent } from '../travel/travel-search.schema';
+import { intentEffectiveBudgetPerPerson, type TravelSearchIntent } from '../travel/travel-search.schema';
 import type { CatalogStats } from './validation.engine';
 
 /**
@@ -23,7 +23,8 @@ export function buildFallbackHints(
       'Conviene clarificar destino, mes aproximado y presupuesto orientativo para mejorar el ranking sin IA de caja negra.',
     );
   }
-  if (intent.budgetPerPerson != null && stats.minPrice != null && intent.budgetPerPerson < stats.minPrice) {
+  const effB = intentEffectiveBudgetPerPerson(intent);
+  if (effB != null && stats.minPrice != null && effB < stats.minPrice) {
     hints.push(
       `Ampliar presupuesto por encima de ~${Math.round(stats.minPrice)} o valorar circuitos más cortos.`,
     );

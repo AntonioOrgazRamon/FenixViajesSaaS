@@ -9,6 +9,8 @@ const c = new TravelTripController();
 const embAdmin = new TravelEmbeddingAdminController();
 
 router.use(requireAuth);
+router.get('/library', c.libraryList.bind(c));
+router.get('/library/:tripId', c.libraryDetail.bind(c));
 router.get('/search', c.search.bind(c));
 router.post('/search-intent', c.searchIntent.bind(c));
 router.get('/recommendation-runs/:runId', c.getRecommendationRun.bind(c));
@@ -20,6 +22,7 @@ router.post('/retrieval/preview', travelEmbeddingAdminLimiter, embAdmin.retrieva
 
 router.get('/', c.list.bind(c));
 router.post('/manual', c.createManual.bind(c));
+router.post('/:id/media/enqueue', c.enqueueTripMedia.bind(c));
 router.post(
   '/:tripId/embedding/regenerate',
   travelEmbeddingAdminLimiter,

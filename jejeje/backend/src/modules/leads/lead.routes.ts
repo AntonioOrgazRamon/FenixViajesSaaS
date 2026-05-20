@@ -14,6 +14,9 @@ router.use(requireRole(['COMPANY_ADMIN', 'COMPANY_USER']));
 router.use(requireCompanyMember);
 
 router.get('/', c.list.bind(c));
+router.post('/', c.create.bind(c));
+router.get('/:leadId/travel-profile', c.getTravelProfile.bind(c));
+router.patch('/:leadId/travel-profile', c.patchTravelProfile.bind(c));
 router.get('/:leadId/smart-proposal', sp.get.bind(sp));
 router.post('/:leadId/smart-proposal/generate', openaiSensitiveIpLimiter, sp.generate.bind(sp));
 router.post('/:leadId/smart-proposal/regenerate', openaiSensitiveIpLimiter, sp.regenerate.bind(sp));

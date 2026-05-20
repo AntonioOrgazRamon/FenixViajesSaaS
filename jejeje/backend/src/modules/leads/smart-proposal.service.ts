@@ -3,21 +3,17 @@ import fs from 'fs/promises';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import PDFDocument from 'pdfkit';
-import {
-  Lead,
-  LeadDetail,
-  LeadActorType,
-  LeadActivityType,
-  Prisma,
-  ProposalStatus,
-} from '@prisma/client';
+import type { Lead, LeadDetail, LeadTravelProfile } from '@prisma/client';
+import { LeadActorType, LeadActivityType, Prisma, ProposalStatus } from '@prisma/client';
 import prisma from '../../infrastructure/db';
 import { NotFoundError, ValidationError } from '../../common/errors/AppError';
 import { logger } from '../../common/logger';
 import { ProposalGenerationService } from '../../services/proposals/proposal-generation.service';
 import { TravelSearchService } from '../../services/travel/travel-search.service';
 import { buildTravelSearchIntentFromSnapshots } from '../../services/travel/proposal-intent.mapper';
+import { buildLeadIntentSnapshots } from '../../services/travel/lead-intent-snapshots';
 import type { TravelSearchResultItem } from '../../services/travel/travel-search.schema';
+import { getPrimaryHeroImageByTripIds } from '../../services/travel/media/travel-media-resolve';
 
 const proposalGenerationHost = new ProposalGenerationService();
 
@@ -43,6 +39,8 @@ export type SmartProposalAnalysisDto = {
     currency: string | null;
     matchScore: number;
     highlights: string[];
+    /** URL hero cacheada (Unsplash/Pexels); solo BD, sin API en tiempo de propuesta. */
+    heroImageUrl?: string | null;
   }>;
 };
 
@@ -98,7 +96,11 @@ function readSmartMeta(extraData: unknown): {
   };
 }
 
-function getDestinationFromLead(lead: Lead & { details: LeadDetail | null }): string | null {
+function getDestinationFromLead(
+  lead: Lead & { details: LeadDetail | null; travelProfile?: LeadTravelProfile | null },
+): string | null {
+  const tp = lead.travelProfile?.destinationText?.trim();
+  if (tp) return tp;
   const np = lead.normalizedPayload as { travel?: { destination?: string } } | null;
   const tc = lead.details?.travelContext as { destination?: string } | null | undefined;
   const ctx = lead.details?.currentContext as { destination?: string } | null | undefined;
@@ -115,7 +117,12 @@ function getDestinationFromLead(lead: Lead & { details: LeadDetail | null }): st
   return tc?.destination?.trim() ?? ctx?.destination?.trim() ?? null;
 }
 
-function getTravelDateHint(lead: Lead & { details: LeadDetail | null }): string | null {
+function getTravelDateHint(
+  lead: Lead & { details: LeadDetail | null; travelProfile?: LeadTravelProfile | null },
+): string | null {
+  const fromProf =
+    lead.travelProfile?.travelDateFrom?.toISOString() ?? lead.travelProfile?.travelDateText ?? null;
+  if (fromProf && String(fromProf).trim()) return String(fromProf).trim().slice(0, 80);
   const np = lead.normalizedPayload as { travel?: { travelDate?: string } } | null;
   const tc = lead.details?.travelContext as { travelDate?: string } | null | undefined;
   const ctx = lead.details?.currentContext as { travelDate?: string } | null | undefined;
@@ -123,7 +130,9 @@ function getTravelDateHint(lead: Lead & { details: LeadDetail | null }): string 
   return typeof t === 'string' && t ? t : null;
 }
 
-function getSeatsHint(lead: Lead & { details: LeadDetail | null }): number | null {
+function getSeatsHint(
+  lead: Lead & { details: LeadDetail | null; travelProfile?: LeadTravelProfile | null },
+): number | null {
   const np = lead.normalizedPayload as { travel?: { seats?: number } } | null;
   const tc = lead.details?.travelContext as { seats?: number } | null | undefined;
   const ctx = lead.details?.currentContext as { seats?: number } | null | undefined;
@@ -161,7 +170,7 @@ async function enrichTripMeta(
 
 async function buildAnalysis(
   companyId: string,
-  lead: Lead & { details: LeadDetail | null },
+  lead: Lead & { details: LeadDetail | null; travelProfile: LeadTravelProfile | null },
   trips: TripPick[],
 ): Promise<SmartProposalAnalysisDto> {
   const dest = getDestinationFromLead(lead);
@@ -190,23 +199,7 @@ async function buildAnalysis(
     0.35 + (dest ? 0.25 : 0) + (travelDate ? 0.18 : 0) + (seats ? 0.12 : 0) + (lead.message ? 0.1 : 0),
   );
 
-  const snapshots: unknown[] = [];
-  if (
-    lead.normalizedPayload &&
-    typeof lead.normalizedPayload === 'object' &&
-    !Array.isArray(lead.normalizedPayload)
-  ) {
-    snapshots.push(lead.normalizedPayload);
-  }
-  if (lead.details?.travelContext && typeof lead.details.travelContext === 'object') {
-    snapshots.push(lead.details.travelContext);
-  }
-  if (lead.details?.currentContext && typeof lead.details.currentContext === 'object') {
-    snapshots.push(lead.details.currentContext);
-  }
-  if (lead.message?.trim()) {
-    snapshots.push({ message: lead.message });
-  }
+  const snapshots = buildLeadIntentSnapshots(lead);
 
   const intent = buildTravelSearchIntentFromSnapshots(snapshots);
   const response = await new TravelSearchService().searchByIntent(companyId, intent);
@@ -410,10 +403,10 @@ async function loadApprovedTrips(companyId: string, role: string): Promise<TripP
 async function ensureLeadWithDetails(
   companyId: string,
   leadId: string,
-): Promise<Lead & { details: LeadDetail | null }> {
+): Promise<Lead & { details: LeadDetail | null; travelProfile: LeadTravelProfile | null }> {
   const lead = await prisma.lead.findFirst({
     where: { id: leadId, companyId, deletedAt: null },
-    include: { details: true },
+    include: { details: true, travelProfile: true },
   });
   if (!lead) throw new NotFoundError('Lead no encontrado');
   return lead;
@@ -508,6 +501,16 @@ export class SmartProposalService {
         ? analysisFromSnapshot
         : await buildAnalysis(companyId, lead, trips);
 
+    const tripIdsForHero = [...new Set(analysis.recommendedTrips.map((x) => x.id))];
+    const heroes = await getPrimaryHeroImageByTripIds(companyId, tripIdsForHero);
+    const analysisWithHero: SmartProposalAnalysisDto = {
+      ...analysis,
+      recommendedTrips: analysis.recommendedTrips.map((x) => ({
+        ...x,
+        heroImageUrl: heroes.get(x.id) ?? null,
+      })),
+    };
+
     let pdfAvailable = false;
     if (latest?.pdfStoragePath) {
       const abs = path.isAbsolute(latest.pdfStoragePath)
@@ -530,7 +533,7 @@ export class SmartProposalService {
       vendorNotified: meta.vendorNotified,
       vendorNotifiedAt: meta.vendorNotifiedAt,
       lastError: meta.lastError,
-      analysis,
+      analysis: analysisWithHero,
       htmlAvailable: !!latest?.generatedHtml,
       pdfAvailable,
     };
@@ -662,17 +665,15 @@ export class SmartProposalService {
       select: { id: true },
     });
     if (pRow) {
-      try {
-        await proposalGenerationHost.finalizeAndNotifySellers({
-          companyId,
-          leadId,
-          proposalId: pRow.id,
-          proposalVersionId: versionId,
-          actorUserId: userId,
-        });
-      } catch (e) {
-        logger.error({ err: e, companyId, leadId, versionId }, 'Finalizar/notificar tras smart-proposal generate');
-      }
+      void proposalGenerationHost.finalizeAndNotifySellers({
+        companyId,
+        leadId,
+        proposalId: pRow.id,
+        proposalVersionId: versionId,
+        actorUserId: userId,
+      }).catch((e) =>
+        logger.error({ err: e, companyId, leadId, versionId }, 'Finalizar/notificar tras smart-proposal generate'),
+      );
     }
 
     return this.getState(companyId, leadId, role);
@@ -759,17 +760,15 @@ export class SmartProposalService {
       },
     });
 
-    try {
-      await proposalGenerationHost.finalizeAndNotifySellers({
-        companyId,
-        leadId,
-        proposalId: proposal.id,
-        proposalVersionId: versionId,
-        actorUserId: userId,
-      });
-    } catch (e) {
-      logger.error({ err: e, companyId, leadId, versionId }, 'Finalizar/notificar tras smart-proposal regenerate');
-    }
+    void proposalGenerationHost.finalizeAndNotifySellers({
+      companyId,
+      leadId,
+      proposalId: proposal.id,
+      proposalVersionId: versionId,
+      actorUserId: userId,
+    }).catch((e) =>
+      logger.error({ err: e, companyId, leadId, versionId }, 'Finalizar/notificar tras smart-proposal regenerate'),
+    );
 
     return this.getState(companyId, leadId, role);
   }

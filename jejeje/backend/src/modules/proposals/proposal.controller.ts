@@ -74,6 +74,7 @@ export class ProposalController {
         recipientKind: result.recipientKind,
         recipientEmails: result.recipientEmails,
         channelResults: result.channelResults,
+        sellerNotificationPendingAsync: result.channelResults.email.pendingAsync === true,
       },
     });
   };

@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Brain, GitBranch, Radar, Sparkles, TrendingUp } from 'lucide-react';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { PanelCard } from '../../../components/ui/PanelCard';
+import { useAuthStore } from '../../../store/authStore';
 
 const pillars = [
   {
@@ -22,6 +23,9 @@ const pillars = [
 ];
 
 export function MotorRecommendationPage() {
+  const role = useAuthStore((s) => s.user?.role);
+  const canPlayground = role === 'COMPANY_ADMIN' || role === 'SUPER_ADMIN';
+
   return (
     <div className="w-full min-w-0 space-y-6">
       <PageHeader
@@ -30,7 +34,7 @@ export function MotorRecommendationPage() {
         actions={
           <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-500/25 bg-cyan-500/[0.08] px-2.5 py-1 text-[11px] font-medium text-cyan-800 dark:text-cyan-200">
             <Sparkles className="h-3 w-3" strokeWidth={2} />
-            Preview de producto
+            Vista previa de producto
           </span>
         }
       />
@@ -69,6 +73,14 @@ export function MotorRecommendationPage() {
           >
             Ir a leads y probar propuesta inteligente →
           </Link>
+          {canPlayground ? (
+            <Link
+              to="/travel/recommendation-playground"
+              className="mt-3 block text-sm font-medium text-teal-700 hover:text-teal-600 dark:text-teal-300 dark:hover:text-teal-200"
+            >
+            Abrir laboratorio de recomendación (demo y calibración del motor) →
+            </Link>
+          ) : null}
         </PanelCard>
       </div>
 

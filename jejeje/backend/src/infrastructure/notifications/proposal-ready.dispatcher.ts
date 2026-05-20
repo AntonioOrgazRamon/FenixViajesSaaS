@@ -46,19 +46,17 @@ export async function dispatchProposalReadyEvent(params: {
     proposalPdfUrl: payload.proposalPdfUrl,
   };
 
-  const perRecipient: Array<{ to: string } & ChannelAttempt> = [];
-  for (const r of recipients) {
-    const { subject, text, html } = buildProposalReadyEmail({
-      ...baseInput,
-      recipientFirstName: r.firstName,
-    });
-    const send = await sendOperationalEmail({ to: r.email, subject, text, html });
-    if (send.sent) {
-      perRecipient.push({ to: r.email, ok: true });
-    } else {
-      perRecipient.push({ to: r.email, ok: false, error: send.error });
-    }
-  }
+  const perRecipient: Array<{ to: string } & ChannelAttempt> = await Promise.all(
+    recipients.map(async (r) => {
+      const { subject, text, html } = buildProposalReadyEmail({
+        ...baseInput,
+        recipientFirstName: r.firstName,
+      });
+      const send = await sendOperationalEmail({ to: r.email, subject, text, html });
+      if (send.sent) return { to: r.email, ok: true as const };
+      return { to: r.email, ok: false as const, error: send.error };
+    }),
+  );
 
   const emailAggregateOk = perRecipient.length > 0 && perRecipient.every((x) => x.ok);
   const emailResult =

@@ -1,0 +1,36 @@
+/* Tipografía premium (Google Fonts) enlazada en index.html */
+:root {
+  --ink: #0f2534;
+  --ink-soft: #1e4154;
+  --muted: #5a6f7b;
+  --accent: #0c6f7d;
+  --accent-dark: #084a52;
+  --card: rgba(255, 255, 255, 0.92);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+  font-family: 'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(120% 90% at 10% 0%, rgba(196, 230, 235, 0.65) 0%, transparent 55%),
+    radial-gradient(90% 70% at 90% 10%, rgba(232, 218, 200, 0.5) 0%, transparent 50%),
+    linear-gradient(180deg, #e8f3f5 0%, #f6f4f0 48%, #e3eef2 100%);
+  min-height: 100vh;
+}
+
+code {
+  font-family: ui-monospace, 'Cascadia Code', monospace;
+  font-size: 0.88em;
+}

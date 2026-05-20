@@ -26,6 +26,47 @@ export const leadPriorityEnum = z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']);
 
 export const leadLanguageEnum = z.enum(['es', 'en']);
 
+export const travelLeadBudgetTypeZ = z.enum(['PER_PERSON', 'TOTAL', 'UNKNOWN']);
+export const travelLeadTripTypeZ = z.enum([
+  'VACATIONAL',
+  'HONEYMOON',
+  'GROUP',
+  'FAMILY',
+  'BUSINESS',
+  'OTHER',
+  'UNKNOWN',
+]);
+
+export const travelProfileInputSchema = z.object({
+  destinationText: z.string().max(500).optional().nullable(),
+  preferredDestinations: z.array(z.string().max(120)).max(32).optional().nullable(),
+  activitiesText: z.string().max(8000).optional().nullable(),
+  activityTags: z.array(z.string().max(80)).max(40).optional().nullable(),
+  travelDateText: z.string().max(500).optional().nullable(),
+  travelDateFrom: z.string().datetime().optional().nullable(),
+  travelDateTo: z.string().datetime().optional().nullable(),
+  flexibleDates: z.boolean().optional().nullable(),
+  /** Duración orientativa del viaje en días (1–365). */
+  durationDays: z.number().int().min(1).max(365).optional().nullable(),
+  budgetAmount: z.number().min(0).max(1_000_000_000).optional().nullable(),
+  budgetCurrency: z.string().max(8).optional().nullable(),
+  budgetType: travelLeadBudgetTypeZ.optional().nullable(),
+  tripType: travelLeadTripTypeZ.optional().nullable(),
+  departureAirportText: z.string().max(200).optional().nullable(),
+  departureAirportCode: z.string().max(12).optional().nullable(),
+  rawFormPayload: z.unknown().optional().nullable(),
+});
+
+export const patchTravelProfileSchema = travelProfileInputSchema.partial();
+
+export const createLeadBodySchema = z.object({
+  name: z.string().min(1).max(255),
+  email: z.union([z.string().email(), z.literal('')]).optional().nullable(),
+  phone: z.string().max(50).optional().nullable(),
+  message: z.string().max(20000).optional().nullable(),
+  travelProfile: travelProfileInputSchema.optional(),
+});
+
 export const intakeBodySchema = z.object({
   source: leadSourceEnum,
   source_detail: z.string().max(150).optional(),

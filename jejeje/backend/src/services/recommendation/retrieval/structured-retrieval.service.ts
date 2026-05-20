@@ -1,8 +1,8 @@
 import { TripBudgetTier } from '@prisma/client';
-import type { TravelSearchIntent } from '../../travel/travel-search.schema';
+import { intentEffectiveBudgetPerPerson, type TravelSearchIntent } from '../../travel/travel-search.schema';
 import type { TravelTripSearchRow, DestinationPointsGeoOpts } from '../../travel/travel-search.scoring';
 import { tokenize } from '../../travel/travel-search.scoring';
-import { destinationPoints, inferAxesFromKeywords, tripCorpus } from '../scoring.engine';
+import { destinationPoints, inferAxesFromKeywords, tripCorpus, bestPreferredDestinationPoints } from '../scoring.engine';
 import type { TravelStyleAxis } from '@prisma/client';
 
 function monthFromIntent(intent: TravelSearchIntent): number | null {
@@ -40,7 +40,7 @@ export function structuredRetrieve(
   geoOpts?: DestinationPointsGeoOpts,
 ): StructuredHit[] {
   const intentMonth = monthFromIntent(intent);
-  const intentTier = budgetTierFromIntentAmount(intent.budgetPerPerson);
+  const intentTier = budgetTierFromIntentAmount(intentEffectiveBudgetPerPerson(intent));
   const intentAxes = new Set(
     (intent.travelStyleAxes?.length ? intent.travelStyleAxes : inferAxesFromKeywords(intent)) as TravelStyleAxis[],
   );
@@ -59,6 +59,12 @@ export function structuredRetrieve(
 
     if (intent.destination?.trim()) {
       s += destinationPoints(intent.destination, trip, geoOpts) / 30;
+      parts += 1;
+    }
+
+    if (intent.preferredDestinations?.length) {
+      const { rawPts } = bestPreferredDestinationPoints(intent, trip, geoOpts);
+      s += Math.min(1, rawPts / 30) * 0.42;
       parts += 1;
     }
 
@@ -85,7 +91,7 @@ export function structuredRetrieve(
       const dist = Math.abs(ia - ta);
       s += Math.max(0, 1 - dist * 0.22);
       parts += 1;
-    } else if (intent.budgetPerPerson != null) {
+    } else if (intentEffectiveBudgetPerPerson(intent) != null) {
       s += 0.25;
       parts += 1;
     }

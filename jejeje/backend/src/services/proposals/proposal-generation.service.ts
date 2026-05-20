@@ -1,10 +1,11 @@
-import type { Lead, TravelTrip } from '@prisma/client';
+import type { Lead, LeadTravelProfile, TravelTrip } from '@prisma/client';
 import {
   type TravelSearchIntent,
   type TravelSearchResponse,
   type TravelSearchResultItem,
   TRAVEL_SEARCH_SCHEMA_VERSION,
   criteriaAppliedFromIntent,
+  intentEffectiveBudgetPerPerson,
 } from '../travel/travel-search.schema';
 import {
   TravelSearchService,
@@ -14,9 +15,10 @@ import {
 import { runTravelRecommendation } from '../recommendation/pipeline';
 import { reorderWithDiversity } from '../recommendation/diversity.engine';
 import { pickCommercialSlots } from '../recommendation/slots.engine';
+import { COMMERCIAL_SCORE_TOLERANCE } from '../recommendation/constants';
 import { buildTravelSearchIntentFromSnapshots } from '../travel/proposal-intent.mapper';
 import type { ProposalTripInput } from '../../modules/proposals/proposal.schema';
-import type { TripCardVm, ProposalHtmlViewModel } from './proposal-html-template';
+import type { TripCardVm, ProposalHtmlViewModel, ProposalConfidenceSection } from './proposal-html-template';
 import { renderTravelProposalHtml } from './proposal-html-template';
 import { generateProposalCommercialCopy } from './proposal-copy-ai.service';
 import { htmlToPdfBuffer } from './proposal-pdf.service';
@@ -27,6 +29,9 @@ import {
   finalizeProposalVersionGeneration,
   type FinalizeProposalVersionParams,
 } from './proposal-version-finalize.service';
+import { attachPremiumUxToResponse } from '../recommendation/recommendation-premium-ux';
+import { getPrimaryHeroImageByTripIds } from '../travel/media/travel-media-resolve';
+import { tripTypeCustomerLabel } from '../travel/lead-travel-profile.mapper';
 
 export type CompanyProposalBranding = {
   name: string;
@@ -125,15 +130,62 @@ async function resolveSearch(
     });
     const rowsById = new Map(rows.map((r) => [r.id, r]));
     response.ranked = reorderWithDiversity(rowsById, response.ranked);
-    response.picks = pickCommercialSlots(response.ranked, rowsById);
+    response.picks = pickCommercialSlots(response.ranked, rowsById, COMMERCIAL_SCORE_TOLERANCE, intent);
   }
 
-  return {
+  return attachPremiumUxToResponse(intent, {
     ...response,
     schemaVersion: TRAVEL_SEARCH_SCHEMA_VERSION,
     criteriaApplied: criteriaAppliedFromIntent(intent),
     totalCandidates: trips.length,
-  };
+  });
+}
+
+function matchStateCustomerLabel(ms: TravelSearchResultItem['matchState']): string {
+  switch (ms) {
+    case 'STRONG_MATCH':
+      return 'Encaje alto';
+    case 'WEAK_MATCH':
+      return 'Encaje moderado';
+    case 'NO_MATCH':
+      return 'Encaje limitado';
+    case 'NEEDS_CLARIFICATION':
+      return 'Requiere aclaraciones';
+    default:
+      return ms;
+  }
+}
+
+function buildTripWhyFitLines(scored: TravelSearchResultItem | null | undefined): string[] {
+  if (!scored) return [];
+  const fromContrib = scored.contributions
+    .filter(
+      (c) =>
+        c.weight > 0 &&
+        c.contribution >= c.weight * 0.45 &&
+        c.factor !== 'dossier_completeness',
+    )
+    .map((c) => c.explanationCustomer.trim())
+    .filter(Boolean);
+  const merged = [...scored.matches.map((m) => m.trim()).filter(Boolean), ...fromContrib];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const x of merged) {
+    if (seen.has(x)) continue;
+    seen.add(x);
+    out.push(x);
+    if (out.length >= 6) break;
+  }
+  return out;
+}
+
+function proposalConfidenceSectionsFromPremium(pux: TravelSearchResponse['premiumUx']): ProposalConfidenceSection[] {
+  const cp = pux.confidencePanel;
+  return [
+    { headline: cp.matchQualityHeadline, text: cp.matchQualityBody },
+    { headline: cp.catalogCoverageHeadline, text: cp.catalogCoverageBody },
+    { headline: cp.confidenceHeadline, text: cp.confidenceBody },
+  ];
 }
 
 function tripCardVm(
@@ -146,27 +198,39 @@ function tripCardVm(
   > & {
     highlights: { text: string }[];
   },
+  heroImageUrl?: string | null,
 ): TripCardVm {
   const priceNum = trip.indicativePrice != null ? Number(trip.indicativePrice) : null;
   const priceLine = formatMoney(priceNum, trip.currency);
 
   const highlights = trip.highlights.map((h) => h.text.trim()).filter(Boolean).slice(0, 5);
 
-  const contribHint = scored?.contributions
-    ?.slice(0, 2)
-    .map((c) => `${c.factor} ${c.raw}/${c.weight}`)
-    .join(' · ');
+  const confPct =
+    scored?.confidence != null ? `${Math.round(scored.confidence * 100)}%` : 'n/d';
+  const adjustmentNote =
+    scored?.rawScore != null && scored.rawScore !== scored.score
+      ? ' Ajuste aplicado por cobertura parcial de criterios.'
+      : '';
   const scoreLine = scored
-    ? `${scored.score}/100 · ${scored.matchState}${contribHint ? ` · ${contribHint}` : ''} · ${scored.reasons.slice(0, 2).join(' · ')}`
+    ? `${matchStateCustomerLabel(scored.matchState)} · confianza ${confPct}.${adjustmentNote}`
     : null;
+
+  const whyFitLines = buildTripWhyFitLines(scored);
 
   const subtitleParts = [trip.season?.trim(), trip.description?.trim()?.slice(0, 160)].filter(Boolean);
 
   const matches = scored?.matches?.length ? [...scored.matches] : [];
   const misses = scored?.misses?.length ? [...scored.misses] : [];
-  const commercialPitch =
+  let commercialPitch =
     scored?.commercialAngle?.trim() ||
     'Revisar encaje con la intención del cliente usando el scoring y el dossier del viaje en catálogo.';
+  if (scored?.matchState === 'NO_MATCH') {
+    commercialPitch = `${commercialPitch} Encaje débil frente a los criterios: validar expectativas antes de prometer ajuste total.`;
+  }
+
+  const hero =
+    heroImageUrl && heroImageUrl.startsWith('https://') ? heroImageUrl : null;
+  const heroAlt = trip.mainDestination ? `${trip.title} — ${trip.mainDestination}` : trip.title;
 
   return {
     label,
@@ -180,9 +244,12 @@ function tripCardVm(
       ? highlights
       : ['Consultar condiciones y servicios incluidos en el dossier del viaje.'],
     scoreLine,
+    whyFitLines,
     commercialPitch,
     matches,
     misses,
+    heroImageUrl: hero,
+    heroImageAlt: heroAlt,
   };
 }
 
@@ -202,8 +269,170 @@ function aggregateAlignment(picks: TravelSearchResponse['picks']): { matches: st
   };
 }
 
+function buildLimitationLines(search: TravelSearchResponse): string[] {
+  const fromVal = search.validationIssues
+    .filter((i) => i.severity === 'WARN' || i.severity === 'CLARIFICATION')
+    .map((i) => (i.messageCustomer ?? i.message).trim())
+    .filter(Boolean);
+  const hints = search.fallbackHints.map((h) => h.trim()).filter(Boolean);
+  return [...new Set([...fromVal, ...hints])].slice(0, 14);
+}
+
+function deriveCommercialIntroForMatchState(search: TravelSearchResponse): string {
+  switch (search.matchState) {
+    case 'STRONG_MATCH':
+      return 'Estas opciones encajan muy bien con lo que busca el cliente.';
+    case 'WEAK_MATCH':
+      return 'Hemos encontrado opciones parcialmente alineadas, aunque algunos criterios podrían requerir ajustes.';
+    case 'NO_MATCH':
+      return 'No hemos encontrado circuitos que encajen claramente con todos los criterios solicitados. Las opciones mostradas son las más cercanas dentro del catálogo actual.';
+    case 'NEEDS_CLARIFICATION':
+      return 'La intención necesita aclaraciones antes de comprometer encaje. Las referencias de catálogo sirven como punto de partida, no como promesa de cumplimiento total de criterios.';
+    default:
+      return '';
+  }
+}
+
+function deriveOptionsSectionCopy(
+  search: TravelSearchResponse,
+  optionCount: number,
+): { title: string; intro: string } {
+  const n = optionCount;
+  if (search.matchState === 'NO_MATCH' || search.matchState === 'NEEDS_CLARIFICATION') {
+    return {
+      title: 'Referencias de catálogo (transparencia)',
+      intro:
+        n <= 1
+          ? 'Mostramos solo la mejor aproximación disponible para no simular un catálogo amplio que encaje donde no hay encaje claro.'
+          : `Con encaje global débil mostramos solo ${n} referencias como máximo; cada tarjeta incluye score, confianza y brechas explícitas.`,
+    };
+  }
+  if (search.matchState === 'WEAK_MATCH') {
+    return {
+      title: 'Opciones presentadas',
+      intro:
+        'Cuatro perfiles del catálogo (recomendada, presupuesto, premium y alternativa) con scoring determinista. Contraste la confianza global con la de cada tarjeta antes del mensaje comercial.',
+    };
+  }
+  return {
+    title: 'Opciones presentadas',
+    intro:
+      'Cuatro perfiles del catálogo oficial (recomendada, presupuesto, premium y alternativa). Cada tarjeta resume scoring, confianza, coincidencias y brechas frente a la intención.',
+  };
+}
+
+function buildProposalOptionCards(
+  search: TravelSearchResponse,
+  rec: TravelSearchResultItem,
+  budget: TravelSearchResultItem,
+  luxury: TravelSearchResultItem,
+  alternative: TravelSearchResultItem,
+  getTrip: (id: string) => Pick<
+    TravelTrip,
+    'title' | 'mainDestination' | 'durationDays' | 'indicativePrice' | 'currency' | 'season' | 'description'
+  > & { highlights: { text: string }[] },
+  heroes: Map<string, string>,
+): TripCardVm[] {
+  const limit =
+    search.matchState === 'NO_MATCH' || search.matchState === 'NEEDS_CLARIFICATION';
+
+  const cards: TripCardVm[] = [
+    tripCardVm(
+      limit ? 'Mejor aproximación en catálogo' : 'Opción recomendada',
+      'badge-rec',
+      rec,
+      getTrip(rec.tripId),
+      heroes.get(rec.tripId) ?? null,
+    ),
+  ];
+
+  if (!limit) {
+    return [
+      ...cards,
+      tripCardVm('Perfil ajustado al presupuesto', 'badge-eco', budget, getTrip(budget.tripId), heroes.get(budget.tripId) ?? null),
+      tripCardVm('Perfil premium / alta gama', 'badge-prem', luxury, getTrip(luxury.tripId), heroes.get(luxury.tripId) ?? null),
+      tripCardVm(
+        'Alternativa complementaria',
+        'badge-alt',
+        alternative,
+        getTrip(alternative.tripId),
+        heroes.get(alternative.tripId) ?? null,
+      ),
+    ];
+  }
+
+  const threshold = Math.max(30, rec.score - 15);
+  for (const x of [budget, luxury, alternative]) {
+    if (x.tripId === rec.tripId) continue;
+    if (x.score >= threshold) {
+      cards.push(
+        tripCardVm('Referencia adicional (encaje limitado)', 'badge-alt', x, getTrip(x.tripId), heroes.get(x.tripId) ?? null),
+      );
+      break;
+    }
+  }
+  return cards;
+}
+
+function buildKeyClientTravelLines(
+  profile: LeadTravelProfile | null | undefined,
+  intent: TravelSearchIntent,
+): string[] {
+  const lines: string[] = [];
+  const dest =
+    profile?.destinationText?.trim() ||
+    (Array.isArray(profile?.preferredDestinations)
+      ? (profile!.preferredDestinations as unknown[]).filter((x): x is string => typeof x === 'string').join(' / ')
+      : '') ||
+    intent.destination?.trim();
+  if (dest) lines.push(`Destino: ${dest}`);
+
+  const act = profile?.activitiesText?.trim();
+  if (act) lines.push(`Intereses / actividades: ${act.slice(0, 300)}${act.length > 300 ? '…' : ''}`);
+  else if (intent.preferences?.length)
+    lines.push(`Intereses / preferencias: ${intent.preferences.slice(0, 4).join('; ')}`);
+
+  const dateBits = [
+    profile?.travelDateText?.trim(),
+    profile?.travelDateFrom ? profile.travelDateFrom.toISOString().slice(0, 10) : null,
+    profile?.travelDateTo ? profile.travelDateTo.toISOString().slice(0, 10) : null,
+    intent.approximateStartDate?.trim(),
+  ].filter(Boolean);
+  if (dateBits.length) lines.push(`Fecha / periodo: ${[...new Set(dateBits as string[])].join(' · ')}`);
+  if (profile?.flexibleDates) lines.push('Fechas flexibles: sí');
+
+  const cur = profile?.budgetCurrency?.trim() || 'EUR';
+  if (profile?.budgetAmount != null && profile.budgetType && profile.budgetType !== 'UNKNOWN') {
+    const amt = formatMoney(Number(profile.budgetAmount), cur);
+    if (amt) {
+      const scope =
+        profile.budgetType === 'PER_PERSON' ? 'por persona' : profile.budgetType === 'TOTAL' ? 'total del viaje' : '';
+      lines.push(`Presupuesto: ${amt}${scope ? ` (${scope})` : ''}`);
+    }
+  } else {
+    const eff = intentEffectiveBudgetPerPerson(intent);
+    const ib = formatMoney(eff ?? null, cur);
+    if (ib) lines.push(`Presupuesto orientativo: ${ib}`);
+  }
+
+  const tripLabel =
+    profile?.tripType && profile.tripType !== 'UNKNOWN' ? tripTypeCustomerLabel(profile.tripType) : null;
+  if (tripLabel) lines.push(`Tipo de viaje: ${tripLabel}`);
+  else if (intent.travelType?.trim()) lines.push(`Tipo de viaje: ${intent.travelType.trim()}`);
+
+  const dep =
+    [profile?.departureAirportText?.trim(), profile?.departureAirportCode?.trim()].filter(Boolean).join(' · ') ||
+    intent.departureAirport?.trim();
+  if (dep) lines.push(`Aeropuerto / salida: ${dep}`);
+
+  const dur = profile?.durationDays ?? intent.durationDays;
+  if (dur != null && dur >= 1) lines.push(`Duración orientativa: ${dur} días`);
+
+  return lines;
+}
+
 export type GenerationPayload = {
-  lead: Lead;
+  lead: Lead & { travelProfile?: LeadTravelProfile | null };
   company: CompanyProposalBranding;
   intentSnapshots: unknown[];
   explicitTrips?: ProposalTripInput[];
@@ -255,6 +484,8 @@ export class ProposalGenerationService {
       return t;
     };
 
+    const heroes = await getPrimaryHeroImageByTripIds(companyId, tripIds);
+
     const lead = payload.lead;
     const clientLines = [
       lead.fullName || [lead.firstName, lead.lastName].filter(Boolean).join(' ') || 'Cliente sin nombre',
@@ -272,44 +503,49 @@ export class ProposalGenerationService {
         `Presupuesto orientativo por persona: ${intent.budgetPerPerson} (moneda según catálogo)`,
       );
     }
+    if (intent.totalBudget) {
+      intentLines.push(
+        `Presupuesto total orientativo: ${intent.totalBudget} (comparar con precios publicados en catálogo)`,
+      );
+    }
     if (intent.approximateStartDate) intentLines.push(`Fecha / mes deseado: ${intent.approximateStartDate}`);
     if (intent.travelers) intentLines.push(`Viajeros: ${intent.travelers}`);
     if (intent.travelType) intentLines.push(`Tipo de viaje: ${intent.travelType}`);
+    if (intent.departureAirport) intentLines.push(`Salida / aeropuerto: ${intent.departureAirport}`);
     if (intent.tags?.length) intentLines.push(`Etiquetas: ${intent.tags.join(', ')}`);
     if (intent.preferences?.length) intentLines.push(`Preferencias: ${intent.preferences.join('; ')}`);
     if (!intentLines.length) {
       intentLines.push('Sin criterios estructurados en CRM; se usó el catálogo completo para rankear.');
     }
 
+    const keyClientDataLines = buildKeyClientTravelLines(lead.travelProfile ?? null, intent);
+
     const align = aggregateAlignment(search.picks);
 
+    const honestyIntro = deriveCommercialIntroForMatchState(search);
+    let commercialIntro: string | null = honestyIntro;
+
     let deterministicReasons = [
-      ...rec.reasons,
-      `Ángulo comercial (recomendada): ${rec.commercialAngle}`,
-      ...(budget.tripId !== rec.tripId
-        ? [`Perfil presupuesto (${budget.score}/100): ${budget.commercialAngle}`]
-        : []),
-      ...(luxury.tripId !== rec.tripId
-        ? [`Perfil premium (${luxury.score}/100): ${luxury.commercialAngle}`]
-        : []),
-      ...(alternative.tripId !== rec.tripId
-        ? [`Alternativa complementaria (${alternative.score}/100): ${alternative.commercialAngle}`]
-        : []),
-    ].slice(0, 12);
+      ...search.premiumUx.whyRecommendedBullets,
+      ...search.premiumUx.topStrengths.slice(0, 5),
+      `Mensaje comercial sugerido (prioritaria): ${rec.commercialAngle}`,
+    ].slice(0, 14);
 
-    let commercialIntro: string | null =
-      'Gracias por confiar en nosotros para diseñar su próximo viaje. A continuación encontrará cuatro perfiles del catálogo oficial: una recomendación prioritaria, una opción orientada al presupuesto, una propuesta de mayor rango y una alternativa complementaria, con scoring determinista y trazas auditables.';
-
-    let recommendationBullets = deterministicReasons.slice(0, 6);
+    let recommendationBullets = deterministicReasons.slice(0, 8);
 
     let nextStep =
-      'Contactar al cliente para confirmar opción preferida o matices (fechas, hoteles, servicios). Registrar acuerdos en el CRM y solicitar disponibilidad formal a proveedor antes de cotización cerrada.';
+      'Contrastar con el cliente las brechas listadas en cada tarjeta (presupuesto, duración, destino). Registrar acuerdos en el CRM y solicitar disponibilidad formal antes de cotización cerrada.';
 
     if (search.fallbackHints.length) {
-      recommendationBullets = [...search.fallbackHints.slice(0, 3), ...recommendationBullets].slice(0, 8);
+      recommendationBullets = [...search.fallbackHints.slice(0, 4), ...recommendationBullets].slice(0, 10);
     }
 
-    if (payload.useAiCopy) {
+    const proposalOptions = buildProposalOptionCards(search, rec, budget, luxury, alternative, getTrip, heroes);
+    const optionsCopy = deriveOptionsSectionCopy(search, proposalOptions.length);
+
+    const skipAiIntro = search.matchState === 'NO_MATCH' || search.matchState === 'NEEDS_CLARIFICATION';
+
+    if (payload.useAiCopy && !skipAiIntro) {
       try {
         const ai = await generateProposalCommercialCopy({
           companyId: payload.lead.companyId,
@@ -342,6 +578,18 @@ export class ProposalGenerationService {
       ...(payload.company.slug?.trim() ? [`Identificador de empresa: ${payload.company.slug.trim()}`] : []),
     ];
 
+    const limitationLines = buildLimitationLines(search);
+    const considerationLines = [...new Set([...search.premiumUx.mainTradeoffs, ...limitationLines])].slice(0, 20);
+
+    const pux = search.premiumUx;
+    const cp = pux.confidencePanel;
+
+    const docHeroUrl = heroes.get(rec.tripId) ?? null;
+    const primaryTrip = getTrip(rec.tripId);
+    const docHeroAlt = primaryTrip.mainDestination
+      ? `${primaryTrip.title} — ${primaryTrip.mainDestination}`
+      : primaryTrip.title;
+
     const viewModel: ProposalHtmlViewModel = {
       title: `Propuesta de viaje — ${payload.company.name}`,
       generatedAtLabel: `Generado el ${new Date().toLocaleString('es-ES', {
@@ -350,23 +598,40 @@ export class ProposalGenerationService {
       })}`,
       companyName: payload.company.name,
       companyMetaLines,
+      documentHeroImageUrl: docHeroUrl?.startsWith('https://') ? docHeroUrl : null,
+      documentHeroAlt: docHeroAlt,
       clientTitle: 'Datos del cliente',
       clientLines,
-      intentTitle: 'Qué está buscando (resumen)',
+      keyClientDataTitle: keyClientDataLines.length ? 'Datos clave del viaje (negocio)' : '',
+      keyClientDataLines,
+      intentTitle: 'Entendimiento del cliente',
       intentLines,
+      executiveSummaryTitle: 'Resumen ejecutivo',
+      executiveSummaryBody: pux.humanReadableReasoning,
+      whyRecommendedTitle: 'Por qué recomendamos esta dirección',
+      whyRecommendedLines: pux.whyRecommendedBullets,
+      confidenceStripTitle: 'Confianza del matching',
+      confidenceSections: proposalConfidenceSectionsFromPremium(pux),
+      informationGapsTitle: 'Información faltante o débil',
+      informationGapsLines: cp.missingInformation,
+      riskLine: cp.partialRecommendationRisk,
+      valueAnchorTitle: 'Qué creemos que más valor aporta',
+      valueAnchorLines: pux.topStrengths.length ? pux.topStrengths : ['Refinar con el cliente sobre prioridades (presupuesto, ritmo, estilo).'],
+      geoContextLine: pux.geoContextLine,
+      similarAlternativesTitle: 'Alternativas similares',
+      similarAlternativesBody: pux.similarAlternativesSummary,
+      considerationsTitle: 'Aspectos a tener en cuenta',
+      considerationLines,
       commercialIntro,
-      options: {
-        recommended: tripCardVm('Opción recomendada', 'badge-rec', rec, getTrip(rec.tripId)),
-        budget: tripCardVm('Perfil ajustado al presupuesto', 'badge-eco', budget, getTrip(budget.tripId)),
-        luxury: tripCardVm('Perfil premium / alta gama', 'badge-prem', luxury, getTrip(luxury.tripId)),
-        alternative: tripCardVm('Alternativa complementaria', 'badge-alt', alternative, getTrip(alternative.tripId)),
-      },
-      reasonsTitle: 'Motivos de la recomendación (visión general)',
+      optionsSectionTitle: optionsCopy.title,
+      optionsIntro: optionsCopy.intro,
+      proposalOptions,
+      reasonsTitle: 'Notas para el equipo comercial',
       reasons: recommendationBullets,
       nextStepTitle: 'Siguiente paso para el vendedor',
       nextStepBody: nextStep,
       footerNote:
-        'Documento generado automáticamente. Precios y disponibilidad son orientativos hasta confirmación con proveedores. Las condiciones contractuales definitivas se formalizarán en la reserva.',
+        'Documento generado automáticamente. Precios y disponibilidad son orientativos hasta confirmación con proveedores. Las condiciones contractuales definitivas se formalizarán en la reserva. La notificación por correo al equipo puede completarse en segundo plano.',
     };
 
     const html = renderTravelProposalHtml(viewModel);

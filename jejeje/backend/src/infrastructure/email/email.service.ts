@@ -25,6 +25,10 @@ function buildTransport(): nodemailer.Transporter<SMTPTransport.SentMessageInfo>
     port: parseInt(config.SMTP_PORT, 10) || 587,
     secure: config.SMTP_SECURE,
     auth: { user, pass },
+    /** Evita que propuestas / resets queden colgados si el relay no responde (IPv6/TLS mal configurados). */
+    connectionTimeout: config.SMTP_CONNECTION_TIMEOUT_MS,
+    greetingTimeout: config.SMTP_GREETING_TIMEOUT_MS,
+    socketTimeout: config.SMTP_SOCKET_TIMEOUT_MS,
   });
 }
 

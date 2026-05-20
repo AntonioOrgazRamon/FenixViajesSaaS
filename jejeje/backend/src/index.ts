@@ -40,6 +40,9 @@ if (config.NODE_ENV === 'development') {
   allowedOrigins.add('http://127.0.0.1:5173');
   allowedOrigins.add('http://127.0.0.1:5174');
   allowedOrigins.add('http://127.0.0.1:5175');
+  // SPA Angular de prueba (captación leads), sin tocar el frontend React principal
+  allowedOrigins.add('http://localhost:4200');
+  allowedOrigins.add('http://127.0.0.1:4200');
 }
 
 // Middlewares: CORP same-origin (helmet default) evita mostrar /uploads en <img> si la

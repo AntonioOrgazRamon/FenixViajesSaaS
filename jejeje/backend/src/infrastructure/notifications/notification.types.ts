@@ -30,6 +30,8 @@ export type ChannelAttempt = {
   ok: boolean;
   error?: string;
   skipped?: boolean;
+  /** Correo u otro canal lanzado en segundo plano (respuesta HTTP ya cerrada). */
+  pendingAsync?: boolean;
   detail?: unknown;
 };
 

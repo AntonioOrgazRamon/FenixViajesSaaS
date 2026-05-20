@@ -36,11 +36,14 @@ export async function persistRecommendationRun(params: {
     matchState: r.matchState,
     contributions: r.contributions as unknown as Prisma.InputJsonValue,
     diversityPenalty: null,
-    explainability: {
+      explainability: {
       commercialAngle: r.commercialAngle,
       matches: r.matches,
       misses: r.misses,
       confidence: r.confidence,
+      rawScore: r.rawScore ?? null,
+      matchCoverageDimensions: r.matchCoverageDimensions ?? null,
+      intentSignalBreadth: r.intentSignalBreadth ?? null,
       relaxedAlternative: r.relaxedAlternative ?? false,
       retrievalProvenance: r.retrievalProvenance ?? null,
     } as Prisma.InputJsonValue,

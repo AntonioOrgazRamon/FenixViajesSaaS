@@ -45,9 +45,15 @@ import { AppHomePage } from './features/app/pages/AppHomePage';
 import { MotorRecommendationPage } from './features/app/pages/MotorRecommendationPage';
 import { CompanyIaOpsPage } from './features/app/pages/CompanyIaOpsPage';
 import { LeadsListPage } from './features/leads/pages/LeadsListPage';
+import { LeadCreatePage } from './features/leads/pages/LeadCreatePage';
 import { LeadDetailPage } from './features/leads/pages/LeadDetailPage';
 import { TravelCatalogPage } from './features/travel/pages/TravelCatalogPage';
 import { TravelImportCenterPage } from './features/travel/pages/TravelImportCenterPage';
+import { TravelRecommendationPlaygroundPage } from './features/travel/pages/TravelRecommendationPlaygroundPage';
+import { TravelLibraryPage } from './features/travel/pages/TravelLibraryPage';
+import { TravelTripDetailPage } from './features/travel/pages/TravelTripDetailPage';
+import { ProposalLibraryPage } from './features/proposals/pages/ProposalLibraryPage';
+import { ProposalDetailPage } from './features/proposals/pages/ProposalDetailPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -111,8 +117,16 @@ function App() {
                   <Route path="/superadmin/travel" element={<TravelCatalogPage />} />
                 </Route>
 
+                <Route element={<RequireRole roles={['COMPANY_ADMIN', 'COMPANY_USER', 'SUPER_ADMIN']} />}>
+                  <Route path="/travel/library" element={<TravelLibraryPage />} />
+                  <Route path="/travel/library/:tripId" element={<TravelTripDetailPage />} />
+                  <Route path="/proposals/library" element={<ProposalLibraryPage />} />
+                  <Route path="/proposals/library/:proposalId" element={<ProposalDetailPage />} />
+                </Route>
+
                 <Route element={<RequireRole roles={['COMPANY_ADMIN', 'COMPANY_USER']} />}>
                   <Route path="/leads" element={<LeadsListPage />} />
+                  <Route path="/leads/new" element={<LeadCreatePage />} />
                   <Route path="/leads/:id" element={<LeadDetailPage />} />
                   <Route path="/app/motor" element={<MotorRecommendationPage />} />
                   <Route path="/app/users" element={<CompanyUsersListPage />} />
@@ -150,6 +164,7 @@ function App() {
 
                 <Route element={<RequireRole roles={['COMPANY_ADMIN', 'SUPER_ADMIN']} />}>
                   <Route path="/travel/import" element={<TravelImportCenterPage />} />
+                  <Route path="/travel/recommendation-playground" element={<TravelRecommendationPlaygroundPage />} />
                 </Route>
 
                 <Route path="*" element={<NotFoundPage />} />

@@ -1,5 +1,5 @@
-/** Auditoría: Fase 2 añade retrieval híbrido + factor semanticSimilarity. */
-export const SCORING_MODEL_VERSION = 'rec-engine-v2.0.0';
+/** Auditoría: Fase 2 añade retrieval híbrido + factor semanticSimilarity; Fase 3 bonus por destinos nominales en intención. */
+export const SCORING_MODEL_VERSION = 'rec-engine-v2.1.0';
 
 /** Ratio precio/budget por defecto antes de HARD constraint. */
 export const DEFAULT_MAX_BUDGET_HARD_RATIO = 1.55;
@@ -18,6 +18,18 @@ export const DESTINATION_MAIN_POOL_MIN = 6;
 
 /** Máx. puntos del factor semanticSimilarity (sobre vector retrieval, no sustituye destino duro). */
 export const SEMANTIC_SIMILARITY_MAX_POINTS = 15;
+
+/** Bonus acotado por país/lugar citado explícitamente en `preferredDestinations` (no sustituye presupuesto/duración). */
+export const PREFERRED_DESTINATION_BONUS_MAX = 8;
+
+/** Mínimo `destinationPoints` (0–30) sobre ese nombre para conceder parte del bonus. */
+export const PREFERRED_DESTINATION_LEXICAL_FLOOR = 7;
+
+/** Match lexical para forzar slot ALTERNATIVE hacia un preferido nombrado. */
+export const PREFERRED_DESTINATION_SLOT_MIN_POINTS = 10;
+
+/** No sustituir la alternativa por un encaje muy flojo respecto al top del ranking. */
+export const PREFERRED_DESTINATION_SLOT_MAX_SCORE_GAP = 38;
 
 /** Tope de candidatos tras fusión híbrida antes de constraints/scoring. */
 export const HYBRID_RETRIEVAL_POOL_CAP = 100;

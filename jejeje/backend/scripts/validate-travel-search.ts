@@ -84,7 +84,9 @@ void (async () => {
   const picks = response.picks;
   const ranked = response.ranked;
 
-  assert('schema v2', response.schemaVersion === '2.0.0');
+  assert('schema travel search', response.schemaVersion === '2.2.0');
+  assert('trustSummary shape', response.trustSummary.intentCompleteness >= 0 && response.trustSummary.catalogEligibleRatio >= 0);
+  assert('premiumUx reasoning', response.premiumUx.humanReadableReasoning.length > 8);
   assert('ranked non-empty', ranked.length >= 1);
   assert('score range no plateau', ranked[0].score > 40 && ranked[0].score <= 100, String(ranked[0].score));
   assert('contributions', (ranked[0].contributions?.length ?? 0) >= 1);

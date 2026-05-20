@@ -1,4 +1,4 @@
-import type { TravelSearchIntent } from '../travel/travel-search.schema';
+import { intentEffectiveBudgetPerPerson, type TravelSearchIntent } from '../travel/travel-search.schema';
 import type { TravelTripSearchRow } from '../travel/travel-search.scoring';
 import type { ConstraintEvaluation, ConstraintViolation, RecommendationPolicy } from './types';
 import { normalizeKey } from '../travel/travel-search.scoring';
@@ -44,10 +44,11 @@ export function evaluateConstraints(
   }
 
   const ratioLimit = policy.maxBudgetHardRatio ?? 1.55;
+  const budgetCap = intentEffectiveBudgetPerPerson(intent);
   if (
-    intent.budgetPerPerson != null &&
+    budgetCap != null &&
     ctx.numericPrice != null &&
-    ctx.numericPrice > intent.budgetPerPerson * ratioLimit
+    ctx.numericPrice > budgetCap * ratioLimit
   ) {
     violations.push({
       code: 'BUDGET_OVERFLOW_HARD',
@@ -73,10 +74,10 @@ export function evaluateConstraints(
   // SOFT: presupuesto algo por encima pero no catastrófico
   if (
     eligible &&
-    intent.budgetPerPerson != null &&
+    budgetCap != null &&
     ctx.numericPrice != null &&
-    ctx.numericPrice > intent.budgetPerPerson * 1.15 &&
-    ctx.numericPrice <= intent.budgetPerPerson * ratioLimit
+    ctx.numericPrice > budgetCap * 1.15 &&
+    ctx.numericPrice <= budgetCap * ratioLimit
   ) {
     violations.push({
       code: 'BUDGET_SOFT_STRETCH',

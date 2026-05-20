@@ -8,6 +8,8 @@ import { PageHeader } from '../../../components/ui/PageHeader';
 import { PanelCard } from '../../../components/ui/PanelCard';
 import type { LeadListItem } from '../../../types/domain';
 import { cn } from '../../../lib/cn';
+import { LEAD_STATUS_LABELS_ES, labelLeadStatusEs } from '../../../lib/esLabels';
+import { buttonClassName } from '../../../lib/buttonStyles';
 import { appFilterLabel, appInputBorder, appInputFilter, appSelectFilter } from '../../../lib/appTable';
 
 type ListResponse = {
@@ -17,22 +19,10 @@ type ListResponse = {
   page_size: number;
 };
 
-const statusLabels: Record<string, string> = {
-  PENDING_REVIEW: 'Pendiente de revisión',
-  NEW: 'Nuevo',
-  QUALIFYING: 'Cualificando',
-  QUALIFIED: 'Cualificado',
-  CONTACTED: 'Contactado',
-  WAITING: 'En espera',
-  CONVERTED: 'Convertido',
-  LOST: 'Perdido',
-  ARCHIVED: 'Archivado',
-};
-
 function statusChip(status: string) {
   return (
     <span className="rounded-md border border-cyan-500/25 bg-cyan-500/[0.12] px-2 py-0.5 text-[11px] font-medium text-cyan-950 dark:text-cyan-100">
-      {statusLabels[status] ?? status}
+      {labelLeadStatusEs(status)}
     </span>
   );
 }
@@ -99,7 +89,7 @@ function LeadInspector({ row, onClose }: { row: LeadListItem; onClose?: () => vo
       <div className="mt-auto border-t border-zinc-200/80 pt-4 dark:border-white/[0.06]">
         <Link
           to={`/leads/${row.id}`}
-          className="flex w-full items-center justify-center rounded-xl bg-gradient-to-b from-cyan-500 to-cyan-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-cyan-900/20 transition-[filter] hover:brightness-105"
+          className={buttonClassName('primary', 'touch', 'w-full shadow-lg')}
         >
           Abrir ficha completa
         </Link>
@@ -200,6 +190,14 @@ export function LeadsListPage() {
       <PageHeader
         title="Leads"
         description="Vista tipo inbox: lista densa, inspector lateral en escritorio y acceso rápido a la ficha con propuesta IA."
+        actions={
+          <Link
+            to="/leads/new"
+            className={buttonClassName('primary', 'touch', 'text-sm shadow-md shadow-cyan-900/20')}
+          >
+            Nuevo lead
+          </Link>
+        }
       />
 
       {userFilterSummary ? (
@@ -248,7 +246,7 @@ export function LeadsListPage() {
                   }}
                 >
                   <option value="">Todos</option>
-                  {Object.entries(statusLabels).map(([k, v]) => (
+                  {Object.entries(LEAD_STATUS_LABELS_ES).map(([k, v]) => (
                     <option key={k} value={k}>
                       {v}
                     </option>

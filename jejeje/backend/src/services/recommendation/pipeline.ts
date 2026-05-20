@@ -1,10 +1,10 @@
-import type { RecommendationMatchState } from '@prisma/client';
 import { config } from '../../common/config';
 import { logger } from '../../common/logger';
 import type {
   TravelSearchIntent,
   TravelSearchResponse,
   TravelSearchResultItem,
+  RecommendationMatchState,
 } from '../travel/travel-search.schema';
 import {
   TRAVEL_SEARCH_SCHEMA_VERSION,
@@ -28,8 +28,14 @@ import {
 import { reorderWithDiversity } from './diversity.engine';
 import { pickCommercialSlots } from './slots.engine';
 import { buildFallbackHints } from './fallback.engine';
-import { DESTINATION_STRONG_POINTS, SCORING_MODEL_VERSION, SEMANTIC_SIMILARITY_MAX_POINTS } from './constants';
+import { DESTINATION_STRONG_POINTS, SCORING_MODEL_VERSION, SEMANTIC_SIMILARITY_MAX_POINTS, COMMERCIAL_SCORE_TOLERANCE } from './constants';
+import {
+  adjustScoreAndConfidenceForHonesty,
+  deriveHonestItemMatchState,
+  intentSignalBreadth,
+} from './match-honesty.engine';
 import { persistRecommendationRun } from './recommendation-persistence.service';
+import { buildTravelPremiumUx } from './recommendation-premium-ux';
 import { hybridRetrieve } from './retrieval/hybrid-retrieval.service';
 import type { HybridCandidate } from './retrieval/hybrid-retrieval.service';
 
@@ -50,17 +56,6 @@ function buildCommercialAngle(
   const miss = misses[0] ?? softMsgs[0];
   const tail = miss ? ` Ajustar: ${miss}.` : '';
   return `${head}.${tail}`.replace(/\.\./g, '.').trim();
-}
-
-function deriveItemMatchState(
-  score: number,
-  confidence: number | null,
-  relaxed: boolean,
-): RecommendationMatchState {
-  if (relaxed) return 'WEAK_MATCH';
-  if (score >= 72 && (confidence ?? 0) >= 0.58) return 'STRONG_MATCH';
-  if (score >= 44 || (confidence ?? 0) >= 0.42) return 'WEAK_MATCH';
-  return 'NO_MATCH';
 }
 
 function buildScoredTrip(
@@ -98,14 +93,26 @@ function buildScoredTrip(
   let score = bd.baseScore100 ?? 0;
   score = applySoftConstraintPenalty(score, ce.softPenaltyTotal);
 
-  const confidence =
+  const confidenceRaw =
     bd.sumMax > 0
       ? Math.min(1, Math.max(0, bd.sumPts / bd.sumMax))
       : bd.baseScore100 != null
         ? bd.baseScore100 / 100
         : null;
 
-  const matchState = deriveItemMatchState(score, confidence, relaxed);
+  const criteriaApplied = criteriaAppliedFromIntent(intent);
+  const honesty = adjustScoreAndConfidenceForHonesty({
+    score,
+    confidence: confidenceRaw,
+    relaxed,
+    criteriaApplied,
+    bd,
+  });
+
+  score = honesty.score;
+  const confidence = honesty.confidence;
+
+  const matchState = deriveHonestItemMatchState(score, confidence, relaxed, honesty);
   const commercialAngle = buildCommercialAngle(bd.matches, bd.misses, ce.violations, relaxed);
 
   const reasons = [...bd.reasons, ...ce.violations.filter((v) => v.kind === 'SOFT').map((v) => v.message)].slice(
@@ -116,8 +123,11 @@ function buildScoredTrip(
   return {
     tripId: trip.id,
     score,
+    rawScore: honesty.rawScore !== score ? honesty.rawScore : undefined,
     matchState,
     confidence,
+    matchCoverageDimensions: honesty.matchCoverageDimensions,
+    intentSignalBreadth: honesty.intentSignalBreadth,
     contributions: bd.contributions,
     matches: bd.matches,
     misses: bd.misses,
@@ -331,7 +341,7 @@ export async function runTravelRecommendation(params: {
   timings.diversity = Date.now() - tDivStart;
 
   const tSlot = Date.now();
-  const picks = pickCommercialSlots(capped, rowsById);
+  const picks = pickCommercialSlots(capped, rowsById, COMMERCIAL_SCORE_TOLERANCE, intent, geoOpts);
   timings.slots = Date.now() - tSlot;
 
   const vague = validationIssues.some((i) => i.code === 'INTENT_TOO_VAGUE');
@@ -365,11 +375,44 @@ export async function runTravelRecommendation(params: {
     whyNotSample: rejectedSample,
   };
 
-  const responseBase: TravelSearchResponse = {
-    schemaVersion: TRAVEL_SEARCH_SCHEMA_VERSION,
-    criteriaApplied: criteriaAppliedFromIntent(intent),
+  const criteriaApplied = criteriaAppliedFromIntent(intent);
+  const ib = intentSignalBreadth(criteriaApplied);
+  const maxCriteriaSignals = 8;
+  const intentCompleteness =
+    Math.round((Math.min(ib, maxCriteriaSignals) / maxCriteriaSignals) * 1000) / 1000;
+  const catalogEligibleRatio =
+    rows.length > 0
+      ? Math.round((Math.min(capped.length, rows.length) / rows.length) * 1000) / 1000
+      : 0;
+
+  const trustSummaryBlock = {
+    intentSignalBreadth: ib,
+    intentCompleteness,
+    catalogTripCount: rows.length,
+    catalogEligibleRatio,
+    topMatchCoverageDimensions: top?.matchCoverageDimensions ?? null,
+    topRawScoreIfAdjusted: top?.rawScore ?? null,
+  };
+
+  const premiumUx = buildTravelPremiumUx(intent, {
+    criteriaApplied,
     matchState,
     globalConfidence,
+    trustSummary: trustSummaryBlock,
+    validationIssues,
+    fallbackHints,
+    relaxedAlternatives,
+    ranked: capped,
+    picks,
+  });
+
+  const responseBase: TravelSearchResponse = {
+    schemaVersion: TRAVEL_SEARCH_SCHEMA_VERSION,
+    criteriaApplied,
+    matchState,
+    globalConfidence,
+    trustSummary: trustSummaryBlock,
+    premiumUx,
     validationIssues,
     fallbackHints,
     relaxedAlternatives,

@@ -122,6 +122,7 @@ export type SmartProposalTripVm = {
   currency: string | null;
   matchScore: number;
   highlights: string[];
+  heroImageUrl?: string | null;
 };
 
 export type SmartProposalAnalysis = {
@@ -148,6 +149,29 @@ export type SmartProposalState = {
   pdfAvailable: boolean;
 };
 
+export type LeadTravelProfileDto = {
+  id: string;
+  companyId: string;
+  leadId: string;
+  destinationText: string | null;
+  preferredDestinations: unknown;
+  activitiesText: string | null;
+  activityTags: unknown;
+  travelDateText: string | null;
+  travelDateFrom: string | null;
+  travelDateTo: string | null;
+  flexibleDates: boolean | null;
+  budgetAmount: number | null;
+  budgetCurrency: string;
+  budgetType: string;
+  tripType: string;
+  departureAirportText: string | null;
+  departureAirportCode: string | null;
+  rawFormPayload: unknown;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type LeadDetailBundle = {
   lead: LeadListItem & {
     firstName: string | null;
@@ -156,6 +180,7 @@ export type LeadDetailBundle = {
     sourceDetail: string | null;
     rawPayload: unknown;
     normalizedPayload: unknown;
+    travelProfile: LeadTravelProfileDto | null;
     details: {
       purchaseHistory?: unknown;
       currentContext?: unknown;

@@ -12,6 +12,9 @@ function normalizeTrip(raw: unknown): SmartProposalTripVm {
   const tierRaw = t.tier;
   const tier: SmartProposalTier =
     tierRaw === 'economic' || tierRaw === 'premium' || tierRaw === 'recommended' ? tierRaw : DEFAULT_TIER;
+  const heroRaw = t.heroImageUrl;
+  const heroImageUrl =
+    typeof heroRaw === 'string' && heroRaw.startsWith('https://') ? heroRaw : null;
   return {
     id: typeof t.id === 'string' ? t.id : '',
     tier,
@@ -25,6 +28,7 @@ function normalizeTrip(raw: unknown): SmartProposalTripVm {
     highlights: Array.isArray(t.highlights)
       ? t.highlights.filter((h): h is string => typeof h === 'string')
       : [],
+    heroImageUrl,
   };
 }
 

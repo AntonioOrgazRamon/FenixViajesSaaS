@@ -6,25 +6,32 @@ import {
   LeadStatus,
   Prisma,
 } from '@prisma/client';
+import { randomUUID } from 'crypto';
 import prisma from '../../infrastructure/db';
 import { leadIntentExtractorAgent } from '../../services/leads/lead-intent-extractor.agent';
 import { LEAD_INTENT_EXTRACTOR_AGENT_KEY } from '../../services/leads/lead-intent-extractor.schema';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../common/errors/AppError';
 import { isValidLeadStatusTransition } from './lead-status';
 import type { z } from 'zod';
-import type {
+import {
+  createLeadBodySchema,
   intakeBodySchema,
   listLeadsQuerySchema,
-  patchLeadSchema,
   patchLeadDetailsSchema,
+  patchLeadSchema,
+  patchTravelProfileSchema,
   publicLeadFormSchema,
+  travelProfileInputSchema,
 } from './lead.schema';
 
 type IntakeBody = z.infer<typeof intakeBodySchema>;
+type CreateLeadBody = z.infer<typeof createLeadBodySchema>;
 type ListQuery = z.infer<typeof listLeadsQuerySchema>;
 type PatchLead = z.infer<typeof patchLeadSchema>;
 type PatchDetails = z.infer<typeof patchLeadDetailsSchema>;
 type PublicLeadForm = z.infer<typeof publicLeadFormSchema>;
+type TravelProfileInput = z.infer<typeof travelProfileInputSchema>;
+type PatchTravelProfile = z.infer<typeof patchTravelProfileSchema>;
 
 const STRIP_RAW_KEYS = new Set(
   ['companyid', 'company_id', 'assigned_user_id', 'assigneduserid', 'role', 'status', 'internal'],
@@ -41,6 +48,181 @@ function sanitizeRawPayload(input: unknown): unknown {
     out[k] = v;
   }
   return out;
+}
+
+function splitFullName(name: string): { firstName: string | null; lastName: string | null; fullName: string } {
+  const fullName = name.trim();
+  const parts = fullName.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return { firstName: null, lastName: null, fullName: '' };
+  if (parts.length === 1) return { firstName: parts[0]!, lastName: null, fullName };
+  return { firstName: parts[0]!, lastName: parts.slice(1).join(' '), fullName };
+}
+
+function travelProfileHasData(p: TravelProfileInput | undefined): boolean {
+  if (!p) return false;
+  return Object.values(p).some((v) => {
+    if (v === undefined || v === null) return false;
+    if (Array.isArray(v)) return v.length > 0;
+    if (typeof v === 'object') return Object.keys(v as object).length > 0;
+    return true;
+  });
+}
+
+function mapTravelProfileCreate(
+  companyId: string,
+  leadId: string,
+  p: TravelProfileInput,
+): Prisma.LeadTravelProfileUncheckedCreateInput {
+  return {
+    id: randomUUID(),
+    companyId,
+    leadId,
+    destinationText: p.destinationText ?? null,
+    preferredDestinations:
+      p.preferredDestinations === undefined || p.preferredDestinations === null
+        ? Prisma.JsonNull
+        : (p.preferredDestinations as Prisma.InputJsonValue),
+    activitiesText: p.activitiesText ?? null,
+    activityTags:
+      p.activityTags === undefined || p.activityTags === null
+        ? Prisma.JsonNull
+        : (p.activityTags as Prisma.InputJsonValue),
+    travelDateText: p.travelDateText ?? null,
+    travelDateFrom: p.travelDateFrom ? new Date(p.travelDateFrom) : null,
+    travelDateTo: p.travelDateTo ? new Date(p.travelDateTo) : null,
+    flexibleDates: p.flexibleDates ?? null,
+    durationDays:
+      p.durationDays != null && p.durationDays >= 1 && p.durationDays <= 365
+        ? p.durationDays
+        : null,
+    budgetAmount:
+      p.budgetAmount != null && p.budgetAmount > 0 ? p.budgetAmount : null,
+    budgetCurrency: p.budgetCurrency?.trim() || 'EUR',
+    budgetType: p.budgetType ?? 'UNKNOWN',
+    tripType: p.tripType ?? 'UNKNOWN',
+    departureAirportText: p.departureAirportText ?? null,
+    departureAirportCode: p.departureAirportCode ?? null,
+    rawFormPayload:
+      p.rawFormPayload === undefined || p.rawFormPayload === null
+        ? Prisma.JsonNull
+        : (p.rawFormPayload as Prisma.InputJsonValue),
+  };
+}
+
+function mapTravelProfilePatchToUpdate(p: PatchTravelProfile): Prisma.LeadTravelProfileUpdateInput {
+  const u: Prisma.LeadTravelProfileUpdateInput = {};
+  if (p.destinationText !== undefined) u.destinationText = p.destinationText;
+  if (p.preferredDestinations !== undefined) {
+    u.preferredDestinations =
+      p.preferredDestinations === null ? Prisma.JsonNull : (p.preferredDestinations as Prisma.InputJsonValue);
+  }
+  if (p.activitiesText !== undefined) u.activitiesText = p.activitiesText;
+  if (p.activityTags !== undefined) {
+    u.activityTags =
+      p.activityTags === null ? Prisma.JsonNull : (p.activityTags as Prisma.InputJsonValue);
+  }
+  if (p.travelDateText !== undefined) u.travelDateText = p.travelDateText;
+  if (p.travelDateFrom !== undefined) u.travelDateFrom = p.travelDateFrom ? new Date(p.travelDateFrom) : null;
+  if (p.travelDateTo !== undefined) u.travelDateTo = p.travelDateTo ? new Date(p.travelDateTo) : null;
+  if (p.flexibleDates !== undefined) u.flexibleDates = p.flexibleDates;
+  if (p.durationDays !== undefined) {
+    u.durationDays =
+      p.durationDays != null && p.durationDays >= 1 && p.durationDays <= 365
+        ? p.durationDays
+        : null;
+  }
+  if (p.budgetAmount !== undefined) {
+    u.budgetAmount = p.budgetAmount != null && p.budgetAmount > 0 ? p.budgetAmount : null;
+  }
+  if (p.budgetCurrency !== undefined) u.budgetCurrency = p.budgetCurrency?.trim() || 'EUR';
+  if (p.budgetType !== undefined) u.budgetType = p.budgetType ?? 'UNKNOWN';
+  if (p.tripType !== undefined) u.tripType = p.tripType ?? 'UNKNOWN';
+  if (p.departureAirportText !== undefined) u.departureAirportText = p.departureAirportText;
+  if (p.departureAirportCode !== undefined) u.departureAirportCode = p.departureAirportCode;
+  if (p.rawFormPayload !== undefined) {
+    u.rawFormPayload =
+      p.rawFormPayload === null ? Prisma.JsonNull : (p.rawFormPayload as Prisma.InputJsonValue);
+  }
+  return u;
+}
+
+function patchTravelProfileToCreateInput(
+  companyId: string,
+  leadId: string,
+  p: PatchTravelProfile,
+): Prisma.LeadTravelProfileUncheckedCreateInput {
+  const full: TravelProfileInput = {
+    destinationText: p.destinationText ?? null,
+    preferredDestinations: p.preferredDestinations ?? null,
+    activitiesText: p.activitiesText ?? null,
+    activityTags: p.activityTags ?? null,
+    travelDateText: p.travelDateText ?? null,
+    travelDateFrom: p.travelDateFrom ?? null,
+    travelDateTo: p.travelDateTo ?? null,
+    flexibleDates: p.flexibleDates ?? null,
+    durationDays: p.durationDays ?? null,
+    budgetAmount: p.budgetAmount ?? null,
+    budgetCurrency: p.budgetCurrency ?? null,
+    budgetType: p.budgetType ?? null,
+    tripType: p.tripType ?? null,
+    departureAirportText: p.departureAirportText ?? null,
+    departureAirportCode: p.departureAirportCode ?? null,
+    rawFormPayload: p.rawFormPayload ?? null,
+  };
+  return mapTravelProfileCreate(companyId, leadId, full);
+}
+
+export function serializeLeadTravelProfile(row: {
+  id: string;
+  companyId: string;
+  leadId: string;
+  destinationText: string | null;
+  preferredDestinations: Prisma.JsonValue | null;
+  activitiesText: string | null;
+  activityTags: Prisma.JsonValue | null;
+  travelDateText: string | null;
+  travelDateFrom: Date | null;
+  travelDateTo: Date | null;
+  flexibleDates: boolean | null;
+  durationDays: number | null;
+  budgetAmount: Prisma.Decimal | null;
+  budgetCurrency: string;
+  budgetType: string;
+  tripType: string;
+  departureAirportText: string | null;
+  departureAirportCode: string | null;
+  rawFormPayload: Prisma.JsonValue | null;
+  createdAt: Date;
+  updatedAt: Date;
+}): {
+  id: string;
+  companyId: string;
+  leadId: string;
+  destinationText: string | null;
+  preferredDestinations: Prisma.JsonValue | null;
+  activitiesText: string | null;
+  activityTags: Prisma.JsonValue | null;
+  travelDateText: string | null;
+  travelDateFrom: string | null;
+  travelDateTo: string | null;
+  flexibleDates: boolean | null;
+  durationDays: number | null;
+  budgetAmount: number | null;
+  budgetCurrency: string;
+  budgetType: string;
+  tripType: string;
+  departureAirportText: string | null;
+  departureAirportCode: string | null;
+  rawFormPayload: Prisma.JsonValue | null;
+  createdAt: Date;
+  updatedAt: Date;
+} {
+  return {
+    ...row,
+    budgetAmount: row.budgetAmount != null ? Number(row.budgetAmount) : null,
+    travelDateFrom: row.travelDateFrom?.toISOString() ?? null,
+    travelDateTo: row.travelDateTo?.toISOString() ?? null,
+  };
 }
 
 async function assertUserInCompany(userId: string, companyId: string) {
@@ -329,6 +511,147 @@ export class LeadService {
     return { id: lead.id, status: lead.status };
   }
 
+  async createFromCrm(
+    companyId: string,
+    body: CreateLeadBody,
+    actorUserId: string,
+    actorRole: string,
+  ) {
+    const { firstName, lastName, fullName } = splitFullName(body.name);
+    const email = body.email?.trim()?.toLowerCase() || null;
+    const phone = body.phone?.trim() || null;
+    const message = body.message?.trim() || null;
+    const tp = body.travelProfile;
+
+    const normalizedPayload: Record<string, unknown> = {
+      contact: { full_name: fullName, email, phone },
+      message,
+    };
+    if (tp && travelProfileHasData(tp)) {
+      normalizedPayload.travel = {
+        destination: tp.destinationText ?? undefined,
+        travelDate: tp.travelDateFrom ?? tp.travelDateText ?? undefined,
+        activities: tp.activitiesText ?? undefined,
+        departureAirport: tp.departureAirportText ?? undefined,
+        durationDays: tp.durationDays ?? undefined,
+      };
+    }
+
+    const lead = await prisma.$transaction(async (tx) => {
+      const created = await tx.lead.create({
+        data: {
+          companyId,
+          source: 'MANUAL',
+          sourceDetail: 'crm-create',
+          status: 'NEW',
+          firstName,
+          lastName,
+          fullName,
+          email,
+          phone,
+          message,
+          normalizedPayload: normalizedPayload as Prisma.InputJsonValue,
+          createdByUserId: actorUserId,
+        },
+      });
+
+      await tx.leadDetail.create({
+        data: {
+          leadId: created.id,
+          companyId,
+          currentContext: {} as Prisma.InputJsonValue,
+        },
+      });
+
+      if (tp && travelProfileHasData(tp)) {
+        await tx.leadTravelProfile.create({
+          data: mapTravelProfileCreate(companyId, created.id, tp),
+        });
+      }
+
+      await tx.leadActivity.create({
+        data: {
+          companyId,
+          leadId: created.id,
+          actorUserId,
+          actorType: LeadActorType.USER,
+          activityType: LeadActivityType.CREATED,
+          title: 'Lead creado en CRM',
+          description: 'Alta manual con perfil de viaje opcional',
+        },
+      });
+
+      return created;
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        companyId,
+        actorUserId,
+        actorRole,
+        action: 'LEAD_CREATED',
+        targetType: 'LEAD',
+        targetId: lead.id,
+        result: 'SUCCESS',
+        metadata: { source: 'MANUAL', hasTravelProfile: Boolean(tp && travelProfileHasData(tp)) } as Prisma.InputJsonValue,
+      },
+    });
+
+    return this.getById(companyId, lead.id);
+  }
+
+  async getTravelProfile(companyId: string, leadId: string) {
+    await this.getById(companyId, leadId);
+    const row = await prisma.leadTravelProfile.findUnique({ where: { leadId } });
+    return row ? serializeLeadTravelProfile(row) : null;
+  }
+
+  async patchTravelProfile(
+    companyId: string,
+    leadId: string,
+    data: PatchTravelProfile,
+    actorUserId: string,
+    actorRole: string,
+  ) {
+    await this.getById(companyId, leadId);
+    const update = mapTravelProfilePatchToUpdate(data);
+    if (Object.keys(update).length === 0) {
+      const existing = await prisma.leadTravelProfile.findUnique({ where: { leadId } });
+      return existing ? serializeLeadTravelProfile(existing) : null;
+    }
+
+    const row = await prisma.leadTravelProfile.upsert({
+      where: { leadId },
+      create: patchTravelProfileToCreateInput(companyId, leadId, data),
+      update,
+    });
+
+    await prisma.leadActivity.create({
+      data: {
+        companyId,
+        leadId,
+        actorUserId,
+        actorType: LeadActorType.USER,
+        activityType: LeadActivityType.UPDATED,
+        title: 'Perfil de viaje del lead actualizado',
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        companyId,
+        actorUserId,
+        actorRole,
+        action: 'LEAD_UPDATED',
+        targetType: 'LEAD_TRAVEL_PROFILE',
+        targetId: leadId,
+        result: 'SUCCESS',
+      },
+    });
+
+    return serializeLeadTravelProfile(row);
+  }
+
   async list(companyId: string, q: ListQuery) {
     const skip = (q.page - 1) * q.page_size;
     const where: Prisma.LeadWhereInput = {
@@ -372,18 +695,31 @@ export class LeadService {
         orderBy: { [orderField]: orderDir },
         include: {
           assignedUser: { select: { id: true, email: true, firstName: true, lastName: true } },
+          travelProfile: { select: { destinationText: true, travelDateText: true, travelDateFrom: true } },
         },
       }),
       prisma.lead.count({ where }),
     ]);
 
     return {
-      items: rows.map((r) => ({
-        ...r,
-        travel: this.extractTravelSnapshot(r.normalizedPayload),
-        assignedUser: r.assignedUser,
-        lastMovementAt: r.updatedAt,
-      })),
+      items: rows.map((r) => {
+        const snap = this.extractTravelSnapshot(r.normalizedPayload);
+        const tp = r.travelProfile;
+        return {
+          ...r,
+          travel: {
+            destination: snap.destination ?? tp?.destinationText ?? null,
+            travelDate:
+              snap.travelDate ??
+              (tp?.travelDateFrom ? tp.travelDateFrom.toISOString() : null) ??
+              tp?.travelDateText ??
+              null,
+            seats: snap.seats,
+          },
+          assignedUser: r.assignedUser,
+          lastMovementAt: r.updatedAt,
+        };
+      }),
       total,
       page: q.page,
       page_size: q.page_size,
@@ -395,12 +731,16 @@ export class LeadService {
       where: { id: leadId, companyId, deletedAt: null },
       include: {
         details: true,
+        travelProfile: true,
         assignedUser: { select: { id: true, email: true, firstName: true, lastName: true } },
         createdByUser: { select: { id: true, email: true, firstName: true, lastName: true } },
       },
     });
     if (!lead) throw new NotFoundError('Lead no encontrado');
-    return lead;
+    return {
+      ...lead,
+      travelProfile: lead.travelProfile ? serializeLeadTravelProfile(lead.travelProfile) : null,
+    };
   }
 
   async getDetailBundle(companyId: string, leadId: string) {

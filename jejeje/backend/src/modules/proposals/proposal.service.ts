@@ -12,8 +12,10 @@ import prisma from '../../infrastructure/db';
 import { NotFoundError } from '../../common/errors/AppError';
 import { config } from '../../common/config';
 import { logger } from '../../common/logger';
+import { buildLeadIntentSnapshots } from '../../services/travel/lead-intent-snapshots';
 import { ProposalGenerationService } from '../../services/proposals/proposal-generation.service';
 import { finalizeProposalVersionGeneration } from '../../services/proposals/proposal-version-finalize.service';
+import { serializeLeadTravelProfile } from '../leads/lead.service';
 import type { GenerateProposalBody } from './proposal.schema';
 import type { TravelSearchResponse } from '../../services/travel/travel-search.schema';
 
@@ -28,6 +30,7 @@ function buildIntentSnapshotRecord(params: {
   detailsTravel: unknown;
   detailsCurrent: unknown;
   normalizedTravel: unknown;
+  leadTravelProfile: unknown;
   resolvedIntent: unknown;
   search: TravelSearchResponse;
 }): Prisma.InputJsonValue {
@@ -48,6 +51,7 @@ function buildIntentSnapshotRecord(params: {
       leadTravelContext: params.detailsTravel ?? null,
       leadCurrentContext: params.detailsCurrent ?? null,
       leadNormalizedTravel: params.normalizedTravel ?? null,
+      leadTravelProfile: params.leadTravelProfile ?? null,
     },
     resolvedIntent: params.resolvedIntent,
     search: {
@@ -126,7 +130,7 @@ export class ProposalService {
   ) {
     const lead = await prisma.lead.findFirst({
       where: { id: leadId, companyId, deletedAt: null },
-      include: { details: true },
+      include: { details: true, travelProfile: true },
     });
     if (!lead) throw new NotFoundError('Lead no encontrado');
 
@@ -142,12 +146,7 @@ export class ProposalService {
         : null;
     const normalizedTravel = normalizedRoot?.travel ?? null;
 
-    const intentSnapshots: unknown[] = [
-      lead.details?.travelContext,
-      lead.details?.currentContext,
-      normalizedTravel ?? undefined,
-      body.intentSnapshot,
-    ].filter((x) => x !== undefined && x !== null);
+    const intentSnapshots = buildLeadIntentSnapshots(lead, body.intentSnapshot ?? undefined);
 
     const useAiCopy = Boolean(body.useAiCopy !== false && config.OPENAI_API_KEY?.trim());
 
@@ -165,6 +164,7 @@ export class ProposalService {
       detailsTravel: lead.details?.travelContext ?? null,
       detailsCurrent: lead.details?.currentContext ?? null,
       normalizedTravel,
+      leadTravelProfile: lead.travelProfile ? serializeLeadTravelProfile(lead.travelProfile) : null,
       resolvedIntent: gen.intent,
       search: gen.search,
     });
@@ -306,17 +306,18 @@ export class ProposalService {
       return { versionId: version.id };
     });
 
-    try {
-      await finalizeProposalVersionGeneration({
-        companyId,
-        leadId,
-        proposalId: proposal!.id,
-        proposalVersionId: versionId,
-        actorUserId: userId,
-      });
-    } catch (e) {
-      logger.error({ err: e, companyId, leadId, versionId }, 'Finalización/notificación tras generar propuesta');
-    }
+    void finalizeProposalVersionGeneration({
+      companyId,
+      leadId,
+      proposalId: proposal!.id,
+      proposalVersionId: versionId,
+      actorUserId: userId,
+    }).catch((err) =>
+      logger.error(
+        { err, companyId, leadId, proposalId: proposal!.id, versionId },
+        'Finalización/notificación tras generar propuesta',
+      ),
+    );
 
     return this.getById(companyId, proposal!.id);
   }

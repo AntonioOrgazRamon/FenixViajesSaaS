@@ -1,4 +1,4 @@
-import type { TravelSearchIntent } from '../travel/travel-search.schema';
+import { intentEffectiveBudgetPerPerson, type TravelSearchIntent } from '../travel/travel-search.schema';
 import type { TravelTripSearchRow } from '../travel/travel-search.scoring';
 import type { ValidationIssue } from './types';
 
@@ -48,20 +48,23 @@ export function validateIntentAndCatalog(
     return issues;
   }
 
+  const budgetAny = intent.budgetPerPerson != null || intent.totalBudget != null;
   const vague =
     !intent.destination?.trim() &&
     intent.durationDays == null &&
-    intent.budgetPerPerson == null &&
+    !budgetAny &&
     !intent.travelType?.trim() &&
     !(intent.tags?.length) &&
-    !(intent.preferences?.length);
+    !(intent.preferences?.length) &&
+    !(intent.travelStyleAxes?.length) &&
+    !(intent.preferredDestinations?.length);
   if (vague) {
     issues.push({
       code: 'INTENT_TOO_VAGUE',
       severity: 'CLARIFICATION',
-      message: 'Intención vacía o demasiado genérica.',
+      message: 'Intención vacía o demasiado genérica (sin destino, duración, presupuesto, preferencias ni ejes de estilo).',
       messageCustomer:
-        'No hay criterios suficientes (destino, duración, presupuesto o preferencias); las recomendaciones serán orientativas.',
+        'No hay criterios suficientes (destino, duración, presupuesto, preferencias o tipo de experiencia); las recomendaciones serán muy orientativas.',
     });
   }
 
@@ -73,10 +76,11 @@ export function validateIntentAndCatalog(
     });
   }
 
+  const effB = intentEffectiveBudgetPerPerson(intent);
   if (
-    intent.budgetPerPerson != null &&
+    effB != null &&
     stats.minPrice != null &&
-    intent.budgetPerPerson < stats.minPrice * 0.85
+    effB < stats.minPrice * 0.85
   ) {
     issues.push({
       code: 'BUDGET_BELOW_CATALOG_FLOOR',
@@ -87,7 +91,7 @@ export function validateIntentAndCatalog(
     });
   }
 
-  if (stats.missingPriceCount === stats.count && intent.budgetPerPerson != null) {
+  if (stats.missingPriceCount === stats.count && effB != null) {
     issues.push({
       code: 'CATALOG_PRICE_BLIND',
       severity: 'WARN',

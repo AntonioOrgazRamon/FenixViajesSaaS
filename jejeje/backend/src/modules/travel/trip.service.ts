@@ -4,6 +4,7 @@ import { NotFoundError, ValidationError } from '../../common/errors/AppError';
 import { tripAiExtractZ } from '../../services/travel/trip-ai.schemas';
 import { TripNormalizationService } from '../../services/travel/trip-normalization.service';
 import { TripImportService } from '../../services/travel/trip-import.service';
+import { scheduleTravelMediaEnrichment } from '../../services/travel/media/travel-media-enrichment.service';
 
 const normalizer = new TripNormalizationService();
 const tripImport = new TripImportService();
@@ -96,7 +97,15 @@ export class TravelTripService {
       data.currency = body.currency as string | null;
     }
 
-    return prisma.travelTrip.update({ where: { id }, data, include: tripInclude });
+    const updated = await prisma.travelTrip.update({ where: { id }, data, include: tripInclude });
+    const visualContextChanged =
+      data.mainDestination !== undefined ||
+      data.title !== undefined ||
+      data.description !== undefined;
+    if (updated.status === 'APPROVED' && visualContextChanged) {
+      scheduleTravelMediaEnrichment(companyId, id);
+    }
+    return updated;
   }
 
   async setStatus(
@@ -108,11 +117,15 @@ export class TravelTripService {
     if (!t) {
       throw new NotFoundError('Viaje no encontrado');
     }
-    return prisma.travelTrip.update({
+    const updated = await prisma.travelTrip.update({
       where: { id },
       data: { status },
       include: tripInclude,
     });
+    if (status === 'APPROVED') {
+      scheduleTravelMediaEnrichment(companyId, id);
+    }
+    return updated;
   }
 
   async search(

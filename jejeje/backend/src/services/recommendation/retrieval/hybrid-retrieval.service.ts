@@ -104,13 +104,15 @@ export async function hybridRetrieve(
   let queryEmbeddingOk = false;
   const tEmbed = Date.now();
   try {
-    if (config.OPENAI_API_KEY?.trim()) {
+    if (config.TRAVEL_SKIP_INTENT_EMBEDDING) {
+      warnings.push('TRAVEL_SKIP_INTENT_EMBEDDING=true: embedding de intención omitido; canal vector=0.');
+    } else if (!config.OPENAI_API_KEY?.trim()) {
+      warnings.push('Sin OPENAI_API_KEY: canal vector en retrieval en 0.');
+    } else {
       const { query, queryHash } = buildIntentEmbeddingQuery(intent);
       const emb = await embeddingService.embedText(query, `intent:${queryHash}`, { companyId });
       queryVector = emb.vector;
       queryEmbeddingOk = true;
-    } else {
-      warnings.push('Sin OPENAI_API_KEY: canal vector en retrieval en 0.');
     }
   } catch (e) {
     logger.warn({ err: e, companyId }, 'embedding consulta intención falló; retrieval vector=0');
@@ -131,7 +133,11 @@ export async function hybridRetrieve(
   const vectorMs = Date.now() - tVec;
   const vecById = new Map(vecHits.map((h) => [h.tripId, h]));
 
-  if (missingEmbeddingTripIds.length && config.OPENAI_API_KEY?.trim()) {
+  if (
+    missingEmbeddingTripIds.length &&
+    config.OPENAI_API_KEY?.trim() &&
+    !config.TRAVEL_SKIP_INTENT_EMBEDDING
+  ) {
     warnings.push(
       `${missingEmbeddingTripIds.length} viajes sin embedding para modelo actual; ejecute npm run travel:embed.`,
     );

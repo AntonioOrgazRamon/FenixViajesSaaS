@@ -2,8 +2,11 @@ import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Activity,
+  BookOpen,
   Building2,
   ClipboardList,
+  FlaskConical,
+  Files,
   FileText,
   Home,
   LayoutDashboard,
@@ -48,6 +51,103 @@ const subNavClass = ({ isActive }: { isActive: boolean }) =>
       ? 'bg-zinc-200/90 text-zinc-900 dark:bg-white/[0.08] dark:text-zinc-100'
       : 'text-zinc-500 hover:bg-zinc-100/80 hover:text-zinc-800 dark:text-zinc-500 dark:hover:bg-white/[0.04] dark:hover:text-zinc-300',
   );
+
+type NavItem = { to: string; label: string; icon: typeof LayoutDashboard };
+type NavSection = { title: string; items: NavItem[] };
+
+const superNavSections: NavSection[] = [
+  {
+    title: 'Operaciones',
+    items: [
+      { to: '/superadmin/dashboard', label: 'Inicio', icon: LayoutDashboard },
+      { to: '/superadmin/tenants', label: 'Empresas', icon: Building2 },
+      { to: '/superadmin/users', label: 'Usuarios', icon: Users },
+    ],
+  },
+  {
+    title: 'Catálogo y contenidos',
+    items: [
+      { to: '/travel/library', label: 'Biblioteca de viajes', icon: BookOpen },
+      { to: '/proposals/library', label: 'Biblioteca de propuestas', icon: Files },
+      { to: '/superadmin/travel', label: 'Importación PDF (catálogo)', icon: FileText },
+      { to: '/travel/import', label: 'Importación JSON (viajes)', icon: Upload },
+    ],
+  },
+  {
+    title: 'Inteligencia',
+    items: [{ to: '/travel/recommendation-playground', label: 'Laboratorio de recomendación', icon: FlaskConical }],
+  },
+  {
+    title: 'Administración',
+    items: [{ to: '/superadmin/audit-logs', label: 'Auditoría', icon: ClipboardList }],
+  },
+];
+
+const adminNavSections: NavSection[] = [
+  {
+    title: 'Ventas y CRM',
+    items: [
+      { to: '/app/dashboard', label: 'Inicio', icon: LayoutDashboard },
+      { to: '/leads', label: 'Leads', icon: Target },
+    ],
+  },
+  {
+    title: 'Catálogo y contenidos',
+    items: [
+      { to: '/travel/library', label: 'Biblioteca de viajes', icon: BookOpen },
+      { to: '/proposals/library', label: 'Biblioteca de propuestas', icon: Files },
+      { to: '/app/travel', label: 'Importación PDF (catálogo)', icon: FileText },
+      { to: '/travel/import', label: 'Importación JSON (viajes)', icon: Upload },
+    ],
+  },
+  {
+    title: 'Inteligencia',
+    items: [
+      { to: '/app/motor', label: 'Motor de recomendación', icon: Radar },
+      { to: '/app/ia', label: 'IA y costes', icon: Activity },
+    ],
+  },
+  {
+    title: 'Equipo y seguridad',
+    items: [
+      { to: '/app/users', label: 'Usuarios', icon: Users },
+      { to: '/app/users/new', label: 'Nuevo usuario', icon: UserPlus },
+      { to: '/app/admins/new', label: 'Nuevo administrador', icon: Shield },
+      { to: '/app/audit-logs', label: 'Auditoría', icon: ClipboardList },
+    ],
+  },
+];
+
+const companyUserNavSections: NavSection[] = [
+  {
+    title: 'Ventas',
+    items: [
+      { to: '/app/home', label: 'Inicio', icon: Home },
+      { to: '/leads', label: 'Leads', icon: Target },
+    ],
+  },
+  {
+    title: 'Catálogo',
+    items: [
+      { to: '/travel/library', label: 'Biblioteca de viajes', icon: BookOpen },
+      { to: '/proposals/library', label: 'Biblioteca de propuestas', icon: Files },
+    ],
+  },
+  {
+    title: 'Inteligencia',
+    items: [{ to: '/app/motor', label: 'Motor de recomendación', icon: Radar }],
+  },
+  {
+    title: 'Equipo',
+    items: [{ to: '/app/users', label: 'Equipo', icon: Users }],
+  },
+];
+
+function navSectionsForRole(r: AppRole | undefined): NavSection[] {
+  if (r === 'SUPER_ADMIN') return superNavSections;
+  if (r === 'COMPANY_ADMIN') return adminNavSections;
+  return companyUserNavSections;
+}
 
 const shellAside =
   'flex w-[15.5rem] shrink-0 flex-col border-r backdrop-blur-xl ' +
@@ -99,28 +199,6 @@ export function AppShell() {
     navigate('/login', { replace: true });
   };
 
-  const superLinks: { to: string; label: string; icon: typeof LayoutDashboard }[] = [
-    { to: '/superadmin/dashboard', label: 'Inicio', icon: LayoutDashboard },
-    { to: '/superadmin/tenants', label: 'Empresas', icon: Building2 },
-    { to: '/superadmin/users', label: 'Usuarios', icon: Users },
-    { to: '/superadmin/travel', label: 'Catálogo (PDF)', icon: FileText },
-    { to: '/travel/import', label: 'Import JSON', icon: Upload },
-    { to: '/superadmin/audit-logs', label: 'Auditoría', icon: ClipboardList },
-  ];
-
-  const adminLinks: { to: string; label: string; icon: typeof LayoutDashboard }[] = [
-    { to: '/app/dashboard', label: 'Inicio', icon: LayoutDashboard },
-    { to: '/leads', label: 'Leads', icon: Target },
-    { to: '/app/motor', label: 'Motor', icon: Radar },
-    { to: '/app/ia', label: 'IA & costes', icon: Activity },
-    { to: '/app/travel', label: 'Catálogo (PDF)', icon: FileText },
-    { to: '/travel/import', label: 'Import JSON', icon: Upload },
-    { to: '/app/users', label: 'Usuarios', icon: Users },
-    { to: '/app/users/new', label: 'Nuevo usuario', icon: UserPlus },
-    { to: '/app/admins/new', label: 'Nuevo admin', icon: Shield },
-    { to: '/app/audit-logs', label: 'Auditoría', icon: ClipboardList },
-  ];
-
   const profileSubLinks: {
     to: string;
     label: string;
@@ -130,47 +208,46 @@ export function AppShell() {
     { to: '/profile', label: 'Cuenta', end: true, icon: UserCircle },
   ];
 
-  const roleLinks = (r: AppRole | undefined) => {
-    if (r === 'SUPER_ADMIN') return superLinks;
-    if (r === 'COMPANY_ADMIN') return adminLinks;
-    return [
-      { to: '/app/home', label: 'Inicio', icon: Home },
-      { to: '/leads', label: 'Leads', icon: Target },
-      { to: '/app/motor', label: 'Motor', icon: Radar },
-      { to: '/app/users', label: 'Equipo', icon: Users },
-    ] as { to: string; label: string; icon: typeof Home }[];
-  };
-
-  const links = roleLinks(role);
+  const navSections = navSectionsForRole(role);
   const endMatch = (to: string) =>
     to === '/app/users' ||
     to === '/superadmin/users' ||
     to === '/app/travel' ||
     to === '/superadmin/travel' ||
-    to === '/travel/import';
+    to === '/travel/import' ||
+    to === '/travel/recommendation-playground' ||
+    to === '/travel/library' ||
+    to === '/proposals/library';
 
   const NavBlock = ({ onNavigate }: { onNavigate?: () => void }) => (
     <>
-      <div>
-        <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-400 dark:text-zinc-500">
-          Menú
-        </p>
-        <nav className="flex flex-col gap-0.5">
-          {links.map(({ to, label, icon: Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={endMatch(to)}
-              onClick={onNavigate}
-              className={({ isActive }) =>
-                cn(navLinkClass({ isActive }), '[&>svg]:opacity-70 [&[aria-current=page]>svg]:text-cyan-600 dark:[&[aria-current=page]>svg]:text-cyan-300')
-              }
-            >
-              <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} aria-hidden />
-              <span className="truncate">{label}</span>
-            </NavLink>
-          ))}
-        </nav>
+      <div className="space-y-5">
+        {navSections.map((section) => (
+          <div key={section.title}>
+            <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-400 dark:text-zinc-500">
+              {section.title}
+            </p>
+            <nav className="flex flex-col gap-0.5" aria-label={section.title}>
+              {section.items.map(({ to, label, icon: Icon }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  end={endMatch(to)}
+                  onClick={onNavigate}
+                  className={({ isActive }) =>
+                    cn(
+                      navLinkClass({ isActive }),
+                      '[&>svg]:opacity-70 [&[aria-current=page]>svg]:text-cyan-600 dark:[&[aria-current=page]>svg]:text-cyan-300',
+                    )
+                  }
+                >
+                  <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} aria-hidden />
+                  <span className="truncate">{label}</span>
+                </NavLink>
+              ))}
+            </nav>
+          </div>
+        ))}
       </div>
 
       <div className="my-5 h-px bg-zinc-200/90 dark:bg-white/[0.06]" aria-hidden />
@@ -201,10 +278,10 @@ export function AppShell() {
   const brandSub = 'text-[11px] text-zinc-500 dark:text-zinc-500';
 
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-900 antialiased dark:bg-[#0b0c0f] dark:text-zinc-100">
+    <div className="flex h-svh max-h-svh min-h-0 flex-col overflow-hidden bg-zinc-50 text-zinc-900 antialiased dark:bg-[#0b0c0f] dark:text-zinc-100">
       <CommandPalette role={role} />
-      <div className="flex min-h-screen">
-        <aside className={cn('relative hidden lg:flex', shellAside)}>
+      <div className="flex min-h-0 flex-1">
+        <aside className={cn('relative hidden h-full min-h-0 lg:flex', shellAside)}>
           <div
             className="pointer-events-none absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-cyan-400/20 to-transparent dark:via-cyan-500/15"
             aria-hidden
@@ -271,7 +348,7 @@ export function AppShell() {
           </div>
         </aside>
 
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <header
             className={cn(
               'sticky top-0 z-30 hidden items-center justify-between gap-4 border-b px-4 py-2.5 backdrop-blur-xl lg:flex',
@@ -309,7 +386,7 @@ export function AppShell() {
               type="button"
               onClick={() => setMobileOpen(true)}
               className={cn(
-                'flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border text-zinc-700',
+                'flex h-11 min-h-[44px] w-11 min-w-[44px] cursor-pointer items-center justify-center rounded-xl border text-zinc-700',
                 'border-zinc-200/90 bg-white hover:bg-zinc-50',
                 'dark:border-white/10 dark:bg-zinc-900/80 dark:text-zinc-200 dark:hover:bg-white/5',
               )}
@@ -327,7 +404,7 @@ export function AppShell() {
             <button
               type="button"
               onClick={handleLogout}
-              className="cursor-pointer rounded-lg px-2 py-1.5 text-xs font-medium text-cyan-700 hover:bg-cyan-500/10 dark:text-cyan-400/95"
+              className="min-h-11 min-w-[3rem] cursor-pointer rounded-xl px-3 py-2.5 text-sm font-medium text-cyan-700 hover:bg-cyan-500/10 dark:text-cyan-400/95"
             >
               Salir
             </button>
@@ -375,7 +452,7 @@ export function AppShell() {
               <div className="flex-1 overflow-y-auto px-3 py-4">
                 <NavBlock onNavigate={() => setMobileOpen(false)} />
               </div>
-              <div className="space-y-3 border-t border-zinc-200/90 p-3 dark:border-white/[0.06]">
+              <div className="space-y-3 border-t border-zinc-200/90 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] dark:border-white/[0.06]">
                 <SidebarThemeToggle />
                 <button
                   type="button"
@@ -392,12 +469,12 @@ export function AppShell() {
             </div>
           </div>
 
-          <main className="relative flex min-h-0 flex-1 flex-col">
+          <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
             <div
               className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_85%_50%_at_50%_-15%,rgba(34,211,238,0.06),transparent)] opacity-90 dark:opacity-100"
               aria-hidden
             />
-            <div className="relative flex min-h-0 min-w-0 max-w-none flex-1 flex-col overflow-y-auto overscroll-y-contain px-2 py-3 sm:px-3 sm:py-4 lg:px-4 lg:py-5">
+            <div className="relative min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain px-2 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-3 sm:py-4 lg:px-4 lg:py-5">
               <Outlet />
             </div>
           </main>

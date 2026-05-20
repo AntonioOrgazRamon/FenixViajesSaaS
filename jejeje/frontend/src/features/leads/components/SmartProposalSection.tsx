@@ -6,6 +6,7 @@ import { getApiErrorMessage } from '../../../lib/errors';
 import { PanelCard } from '../../../components/ui/PanelCard';
 import type { SmartProposalState, SmartProposalTier, SmartProposalTripVm } from '../../../types/domain';
 import { normalizeSmartProposalState } from '../normalizeSmartProposal';
+import { buttonClassName } from '../../../lib/buttonStyles';
 
 const qk = (leadId: string) => ['lead', leadId, 'smart-proposal'] as const;
 
@@ -41,7 +42,17 @@ function TripRow({ t }: { t: SmartProposalTripVm }) {
       ? `${new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 }).format(t.indicativePrice)}${t.currency ? ` ${t.currency}` : ''}`
       : '—';
   return (
-    <div className="rounded-lg border border-white/[0.06] bg-black/25 p-3">
+    <div className="overflow-hidden rounded-lg border border-white/[0.06] bg-black/25">
+      {t.heroImageUrl && t.heroImageUrl.startsWith('https://') ? (
+        <img
+          src={t.heroImageUrl}
+          alt=""
+          className="h-36 w-full object-cover"
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+        />
+      ) : null}
+      <div className="p-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className={`rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${tierBadgeClass(t.tier)}`}>
           {tierLabel(t.tier)}
@@ -59,6 +70,7 @@ function TripRow({ t }: { t: SmartProposalTripVm }) {
           ))}
         </ul>
       )}
+      </div>
     </div>
   );
 }
@@ -289,7 +301,7 @@ export function SmartProposalSection({ leadId }: { leadId: string }) {
             type="button"
             disabled={busy || phase === 'ready'}
             onClick={() => genMut.mutate()}
-            className="rounded-xl bg-gradient-to-b from-amber-400 to-amber-600 px-4 py-2 text-sm font-semibold text-zinc-950 disabled:cursor-not-allowed disabled:opacity-40"
+            className={buttonClassName('accent', 'md', 'touch')}
           >
             Generar propuesta
           </button>
@@ -297,7 +309,7 @@ export function SmartProposalSection({ leadId }: { leadId: string }) {
             type="button"
             disabled={busy || phase !== 'ready'}
             onClick={() => regenMut.mutate()}
-            className="rounded-xl border border-amber-500/35 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-100 hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:opacity-40"
+            className={buttonClassName('amberOutline', 'md', 'touch')}
           >
             Regenerar
           </button>
@@ -305,7 +317,7 @@ export function SmartProposalSection({ leadId }: { leadId: string }) {
             type="button"
             disabled={!htmlAvailable || busy}
             onClick={() => void openHtml()}
-            className="rounded-xl border border-white/12 px-4 py-2 text-sm text-zinc-200 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
+            className={buttonClassName('panelGhost', 'md', 'touch')}
           >
             Ver HTML
           </button>
@@ -313,7 +325,7 @@ export function SmartProposalSection({ leadId }: { leadId: string }) {
             type="button"
             disabled={!pdfAvailable || busy}
             onClick={() => void downloadPdf()}
-            className="rounded-xl border border-white/12 px-4 py-2 text-sm text-zinc-200 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
+            className={buttonClassName('panelGhost', 'md', 'touch')}
           >
             Descargar PDF
           </button>
@@ -321,7 +333,7 @@ export function SmartProposalSection({ leadId }: { leadId: string }) {
             type="button"
             disabled={busy || vendorNotified || phase !== 'ready'}
             onClick={() => vendorMut.mutate()}
-            className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-100 hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-40"
+            className={buttonClassName('successSoft', 'md', 'touch')}
           >
             Marcar vendedor avisado
           </button>
