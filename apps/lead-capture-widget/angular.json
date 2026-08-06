@@ -3,7 +3,7 @@
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
-    "travel-lead-form-angular": {
+    "lead-capture-widget": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
@@ -39,7 +39,7 @@
         "build": {
           "builder": "@angular-devkit/build-angular:application",
           "options": {
-            "outputPath": "dist/travel-lead-form-angular",
+            "outputPath": "dist/lead-capture-widget",
             "index": "src/index.html",
             "browser": "src/main.ts",
             "polyfills": [
@@ -92,10 +92,10 @@
           "builder": "@angular-devkit/build-angular:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "travel-lead-form-angular:build:production"
+              "buildTarget": "lead-capture-widget:build:production"
             },
             "development": {
-              "buildTarget": "travel-lead-form-angular:build:development"
+              "buildTarget": "lead-capture-widget:build:development"
             }
           },
           "defaultConfiguration": "development"

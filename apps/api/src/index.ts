@@ -40,7 +40,7 @@ if (config.NODE_ENV === 'development') {
   allowedOrigins.add('http://127.0.0.1:5173');
   allowedOrigins.add('http://127.0.0.1:5174');
   allowedOrigins.add('http://127.0.0.1:5175');
-  // SPA Angular de prueba (captación leads), sin tocar el frontend React principal
+  // apps/lead-capture-widget (Angular, captación de leads), independiente de apps/panel
   allowedOrigins.add('http://localhost:4200');
   allowedOrigins.add('http://127.0.0.1:4200');
 }

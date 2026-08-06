@@ -19,12 +19,12 @@ En pantalla: **Configuración API** guarda token y URL base en `localStorage`.
 
 ### CORS
 
-En desarrollo el backend permite `http://localhost:4200` (véase `backend/src/index.ts`).
+En desarrollo el backend permite `http://localhost:4200` (véase `apps/api/src/index.ts`).
 
 ## Comandos
 
 ```bash
-cd travel-lead-form-angular
+cd apps/lead-capture-widget
 npm install
 npm start
 ```
