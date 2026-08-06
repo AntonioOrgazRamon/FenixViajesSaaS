@@ -1,6 +1,8 @@
 import { create } from 'zustand';
+import type { Role } from '@fenix/contracts';
 
-export type AppRole = 'SUPER_ADMIN' | 'COMPANY_ADMIN' | 'COMPANY_USER';
+/** Alias local histórico; el valor real vive en @fenix/contracts (compartido con apps/api). */
+export type AppRole = Role;
 
 export type UserAvatar = {
   type: 'uploaded' | 'default';

@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useEffect } from 'react';
+import { ROLE_VALUES } from '@fenix/contracts';
 import { api } from '../../../lib/axios';
 import { unwrap } from '../../../lib/api';
 import { getApiErrorMessage } from '../../../lib/errors';
@@ -13,7 +14,7 @@ const schema = z.object({
   email: z.string().email().optional().or(z.literal('')),
   firstName: z.string().min(2).optional().or(z.literal('')),
   lastName: z.string().min(2).optional().or(z.literal('')),
-  role: z.enum(['SUPER_ADMIN', 'COMPANY_ADMIN', 'COMPANY_USER']).optional(),
+  role: z.enum(ROLE_VALUES).optional(),
   status: z.enum(['ACTIVE', 'SUSPENDED', 'LOCKED', 'DELETED']).optional(),
   companyId: z.string().uuid().optional().or(z.literal('')),
 });
