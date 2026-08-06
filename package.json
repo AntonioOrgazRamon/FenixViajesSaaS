@@ -1,0 +1,12 @@
+{
+  "name": "fenix-viajes-saas",
+  "private": true,
+  "workspaces": [
+    "apps/api",
+    "apps/panel"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present"
+  }
+}
