@@ -1,18 +1,18 @@
 # Visión general del proyecto (MVP SaaS multiempresa)
 
-Documento de referencia técnica-resumida del estado del repositorio `saas_practicas_nakedcode`: backend API, frontend SPA, datos y despliegue local.
+Documento de referencia técnica-resumida del estado del repositorio: API en `apps/api/`, SPA en `apps/panel/`, datos y despliegue local.
 
 ---
 
 ## Arquitectura
 
-- **Monorepo lógico**: `backend/` (API Node) y `frontend/` (SPA Vite) como aplicaciones independientes enlazadas por HTTP (`VITE_API_URL` → `http://localhost:3000/api/v1` por defecto).
+- **Monorepo lógico**: `apps/api/` (API Node) y `apps/panel/` (SPA Vite) como aplicaciones independientes enlazadas por HTTP (`VITE_API_URL` → `http://localhost:3000/api/v1` por defecto).
 - **Multi-tenant**: empresas (`Company`) con usuarios asociados; roles `SUPER_ADMIN`, `COMPANY_ADMIN`, `COMPANY_USER`.
 - **Autenticación**: JWT de acceso + refresh en sesión almacenada en BD; cabecera `Authorization: Bearer <token>`.
 
 ---
 
-## Backend (`backend/`)
+## Backend (`apps/api/`)
 
 | Área | Detalle |
 |------|---------|
@@ -28,7 +28,7 @@ Errores API normalizados: `{ success: false, error: { code, message } }`.
 
 ---
 
-## Frontend (`frontend/`)
+## Frontend (`apps/panel/`)
 
 | Área | Detalle |
 |------|---------|
@@ -55,9 +55,9 @@ Errores API normalizados: `{ success: false, error: { code, message } }`.
 
 ## Cómo arrancar en local
 
-1. **Base de datos**: seguir `backend/SETUP_DB.md` (MySQL local, Hostinger, etc.) y `DATABASE_URL` en `backend/.env`.
-2. **Backend**: `cd backend && npm install && npm run dev` → suele escuchar en **3000**.
-3. **Frontend**: `cd frontend && npm install && npm run dev` → Vite en **5173** (u otro si el puerto está ocupado).
+1. **Base de datos**: seguir `docs/development/SETUP_DB.md` (MySQL local, Hostinger, etc.) y `DATABASE_URL` en `apps/api/.env`.
+2. **Backend**: `cd apps/api && npm install && npm run dev` → suele escuchar en **3000**.
+3. **Frontend**: `cd apps/panel && npm install && npm run dev` → Vite en **5173** (u otro si el puerto está ocupado).
 
 ---
 

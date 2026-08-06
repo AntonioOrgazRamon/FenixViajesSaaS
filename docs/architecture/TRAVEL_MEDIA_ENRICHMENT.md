@@ -53,7 +53,7 @@ Propuestas / smart-proposal → getPrimaryHeroImageByTripIds → HTML/PDF/UI
 
 ## QA
 
-Scripts en `backend/package.json`:
+Scripts en `apps/api/package.json`:
 
 - `npm run qa:travel-media` — ejecuta (o inspecciona) enriquecimiento para `QA_COMPANY_ID` y opcionalmente `QA_TRIP_ID`; muestra tiempos y conteos de assets/jobs.
 - `npm run qa:travel-media-proposals` — estadísticas de assets; con `QA_LEAD_ID` comprueba que `SmartProposalService.getState` expone `heroImageUrl` y cuenta `<img>` en la última versión HTML.
@@ -74,7 +74,7 @@ Variables: `QA_COMPANY_ID`, opcionales `QA_TRIP_ID`, `QA_LEAD_ID`.
 
 ## Referencias en código
 
-- Servicio: `backend/src/services/travel/media/travel-media-enrichment.service.ts`
-- Resolución solo-BD: `backend/src/services/travel/media/travel-media-resolve.ts`
-- Plantilla propuesta: `backend/src/services/proposals/proposal-html-template.ts`
-- Integración generación: `backend/src/services/proposals/proposal-generation.service.ts`
+- Servicio: `apps/api/src/services/travel/media/travel-media-enrichment.service.ts`
+- Resolución solo-BD: `apps/api/src/services/travel/media/travel-media-resolve.ts`
+- Plantilla propuesta: `apps/api/src/services/proposals/proposal-html-template.ts`
+- Integración generación: `apps/api/src/services/proposals/proposal-generation.service.ts`

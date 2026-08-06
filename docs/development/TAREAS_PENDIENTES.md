@@ -9,7 +9,7 @@ Listado de lo que **falta por cerrar** en el producto, con prioridad a **autenti
 ### Qué ya está hecho (código)
 
 - Flujo “He olvidado mi contraseña” en login, pantallas, API, tokens (SHA-256), política de contraseña, revocación de sesiones y auditoría.
-- Configuración en `backend/.env` de `EMAIL_FROM`, Gmail (`SMTP_HOST`, `SMTP_USER`, etc.). El remitente actual puede ser el que tengas puesto (p. ej. un Gmail dedicado a pruebas).
+- Configuración en `apps/api/.env` de `EMAIL_FROM`, Gmail (`SMTP_HOST`, `SMTP_USER`, etc.). El remitente actual puede ser el que tengas puesto (p. ej. un Gmail dedicado a pruebas).
 
 ### Qué falta para considerar **esta parte terminada** en un entorno real
 
@@ -25,7 +25,7 @@ El código envía el correo **solo si** el servidor puede autenticarse contra Gm
    - Cuenta Google del buzón emisor → [Contraseñas de aplicación](https://myaccount.google.com/apppasswords).  
    - Generar una clave de 16 caracteres (sin espacios).
 
-3. **Editar `saas_practicas_nakedcode/backend/.env`** (o el `.env` del despliegue) y completar, al menos:  
+3. **Editar `apps/api/.env`** (o el `.env` del despliegue) y completar, al menos:  
    - `EMAIL_FROM=` el correo que verá el usuario como remitente.  
    - `SMTP_USER=` (si no lo pones, el código usa el mismo que `EMAIL_FROM`).  
    - `SMTP_PASS=` la contraseña de aplicación (16 caracteres), **nunca** la contraseña normal de la cuenta.  
@@ -65,4 +65,4 @@ Se puede dar por **cerrada la parte de contraseñas y correo** cuando:
 
 ---
 
-*Documento generado para el proyecto bajo `saas_practicas_nakedcode/`. Actualiza este archivo cuando cierres hitos o aparezcan nuevas dependencias.*
+*Documento generado para el proyecto. Actualiza este archivo cuando cierres hitos o aparezcan nuevas dependencias.*

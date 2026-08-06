@@ -25,13 +25,13 @@ Este documento describe la **capa geo progresiva** que convive con el modelo leg
 
 ## Migración SQL
 
-- Migración: `backend/prisma/migrations/20260520103000_travel_geo_model/migration.sql`.
+- Migración: `apps/api/prisma/migrations/20260520103000_travel_geo_model/migration.sql`.
 - **Solo añade tablas** `geo_places` y `trip_geo_places` + FKs; **no borra** tablas ni columnas legacy.
 - Si aparece error **P3015** (“Could not find migration file”), revisa que no exista una carpeta vacía bajo `prisma/migrations/` sin `migration.sql` (en el repo se eliminó el folder huérfano `20260206140000_travel_geo_model` que bloqueaba `migrate deploy`).
 
 ## Checklist operativo (orden recomendado)
 
-Desde `backend/`:
+Desde `apps/api/`:
 
 1. `npx prisma validate`
 2. `npx prisma migrate status` → si hay pendientes, `npx prisma migrate deploy`

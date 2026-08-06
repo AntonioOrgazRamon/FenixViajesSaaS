@@ -13,7 +13,7 @@ Objetivo: saber qué sigue funcionando si la API falla (429, kill switch, sin cl
 | Extracción PDF con IA | Desactivada / errores según flags | Igual |
 | Import JSON travel | OK (no requiere OpenAI) | OK |
 
-## Interruptores relevantes (`backend/src/common/config/index.ts`)
+## Interruptores relevantes (`apps/api/src/common/config/index.ts`)
 
 - `OPENAI_ENABLED`, `OPENAI_GLOBAL_KILL_SWITCH`, `OPENAI_EMBEDDINGS_ENABLED`, etc.
 - **`TRAVEL_SKIP_INTENT_EMBEDDING`** (nuevo): si es `true`, **no** se llama a OpenAI para embeddar la **intención** en retrieval híbrido → canal vector = 0, sin excepciones por cuota. Recomendado en demos y cuando haya 429 en embeddings.

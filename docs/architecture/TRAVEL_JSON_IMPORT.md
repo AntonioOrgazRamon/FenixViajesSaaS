@@ -143,7 +143,7 @@ Cada elemento del array (o el objeto único raíz) debe seguir el **formato enri
 
 
 
-Tipado Zod: `backend/src/services/travel/travel-json-import.schema.ts`. Normalización y reglas de negocio: `travel-json-import-validation.ts` (`normalizeEnrichedTravelJsonItem`, `classifyTravelJsonTrip`).
+Tipado Zod: `apps/api/src/services/travel/travel-json-import.schema.ts`. Normalización y reglas de negocio: `travel-json-import-validation.ts` (`normalizeEnrichedTravelJsonItem`, `classifyTravelJsonTrip`).
 
 
 
@@ -165,7 +165,7 @@ Si el JSON trae los campos del viaje **en la raíz** (sin `trip`) como en versio
 
 
 
-Ejemplo completo actualizado: `backend/fixtures/travel-import-sample.json`.
+Ejemplo completo actualizado: `apps/api/fixtures/travel-import-sample.json`.
 
 
 

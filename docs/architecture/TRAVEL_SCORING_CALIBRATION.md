@@ -2,7 +2,7 @@
 
 **Versión modelo:** `rec-engine-v2.0.0` (`SCORING_MODEL_VERSION`).
 
-Este documento describe los **pesos máximos por factor** en `scoreTripBreakdown` (`backend/src/services/recommendation/scoring.engine.ts`). No sustituye al código fuente.
+Este documento describe los **pesos máximos por factor** en `scoreTripBreakdown` (`apps/api/src/services/recommendation/scoring.engine.ts`). No sustituye al código fuente.
 
 ## Factores principales (con intención completa)
 
@@ -18,7 +18,7 @@ Este documento describe los **pesos máximos por factor** en `scoreTripBreakdown
 
 Si **no hay ninguna dimensión activa** (intención vacía), entra **`dossier_completeness`** (hasta 100 internamente como único factor visible).
 
-## Constantes (`backend/src/services/recommendation/constants.ts`)
+## Constantes (`apps/api/src/services/recommendation/constants.ts`)
 
 - `DESTINATION_STRONG_POINTS` (default **12**): umbral “fuerte” para destino.
 - `DESTINATION_MAIN_POOL_MIN` (default **6**): contexto constraints / pool principal.

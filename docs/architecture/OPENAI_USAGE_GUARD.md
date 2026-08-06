@@ -18,7 +18,7 @@
 
 ## Variables de entorno
 
-Ver `backend/.env.example` (sección OpenAI). Valores por defecto en código: desarrollo con topes bajos; producción con topes más altos (ajustar siempre con volumen real).
+Ver `apps/api/.env.example` (sección OpenAI). Valores por defecto en código: desarrollo con topes bajos; producción con topes más altos (ajustar siempre con volumen real).
 
 ## Comandos
 

@@ -2,7 +2,7 @@
 
 Esta es la documentación **oficial de producto**: qué es el negocio, cómo funciona, qué está decidido y qué no. Es independiente del código — debería ser posible reconstruir el software desde cero leyendo únicamente estos documentos, sin abrir el repositorio.
 
-No confundir con `jejeje/docs/` (nivel superior): esa carpeta contiene informes técnicos de QA, auditorías puntuales de sesiones de desarrollo y notas de implementación — documentación de **proceso**, no de **producto**. Si buscas por qué el negocio funciona como funciona, o qué decisión falta tomar, estás en el lugar correcto.
+No confundir con `docs/architecture/`, `docs/development/` o `docs/history/` (carpetas hermanas): esas contienen referencia técnica de diseño, guías de desarrollo e informes puntuales de sesiones ya cerradas — documentación de **proceso**, no de **producto**. Si buscas por qué el negocio funciona como funciona, o qué decisión falta tomar, estás en el lugar correcto.
 
 ## Índice y cuándo leer cada documento
 

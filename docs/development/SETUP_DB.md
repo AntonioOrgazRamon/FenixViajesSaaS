@@ -1,6 +1,6 @@
 # Guía de configuración de la base de datos (MySQL)
 
-El backend usa **Prisma ORM** y una base de datos **MySQL** (compatible con **MariaDB** en Hostinger). La variable `DATABASE_URL` en `backend/.env` es la conexión principal.
+El backend usa **Prisma ORM** y una base de datos **MySQL** (compatible con **MariaDB** en Hostinger). La variable `DATABASE_URL` en `apps/api/.env` es la conexión principal.
 
 Los identificadores son **UUID en texto (`CHAR(36)`)** a propósito: el mismo esquema de datos sirve para una **migración rápida a PostgreSQL** (cambio de `provider` en Prisma y volcado de datos). El checklist detallado está en `prisma/schema.prisma` al inicio del archivo.
 
@@ -12,7 +12,7 @@ Los identificadores son **UUID en texto (`CHAR(36)`)** a propósito: el mismo es
 
 1. Crea base de datos y usuario MySQL desde el panel; asigna todos los privilegios del usuario a esa base.
 2. Anota host, puerto (suele ser **3306**), nombre de base, usuario y contraseña.
-3. En `backend/.env`:
+3. En `apps/api/.env`:
 
    ```env
    DATABASE_URL="mysql://USUARIO:CONTRASEÑA@HOST:3306/NOMBRE_BD"
@@ -30,7 +30,7 @@ Los identificadores son **UUID en texto (`CHAR(36)`)** a propósito: el mismo es
 docker run --name saas-mysql -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=saas_db -p 3306:3306 -d mysql:8
 ```
 
-Espera unos segundos a que el servidor arranque. En `backend/.env`:
+Espera unos segundos a que el servidor arranque. En `apps/api/.env`:
 
 ```env
 DATABASE_URL="mysql://root:root@localhost:3306/saas_db"

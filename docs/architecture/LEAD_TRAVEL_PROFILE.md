@@ -75,5 +75,5 @@ Opcional: `QA_COMPANY_ID`. Si no hay viajes aprobados, la generación HTML puede
 
 ## Migración
 
-`backend/prisma/migrations/20260521150000_lead_travel_profile/migration.sql`  
-`backend/prisma/migrations/20260521160000_lead_travel_profile_duration_days/migration.sql` — columna `duration_days`
+`apps/api/prisma/migrations/20260521150000_lead_travel_profile/migration.sql`  
+`apps/api/prisma/migrations/20260521160000_lead_travel_profile_duration_days/migration.sql` — columna `duration_days`

@@ -122,15 +122,15 @@ La **identidad (avatar)**: subida, borrado, avatar por defecto (iniciales, color
 
 | Área | Archivos típicos |
 |------|-------------------|
-| Tema (resolución, DOM) | `frontend/src/providers/ThemeProvider.tsx` |
-| Helpers tema | `frontend/src/lib/theme.ts` |
-| Toggle lateral | `frontend/src/components/layout/SidebarThemeToggle.tsx` |
-| Cuenta (formulario) | `frontend/src/features/profile/pages/ProfilePage.tsx` |
-| Estilos y variante `dark` | `frontend/src/index.css` |
-| Tipo de usuario (sesión) | `frontend/src/store/authStore.ts` |
-| API perfil (validación / actualización) | `backend/src/modules/profile/profile.schema.ts`, `profile.service.ts` |
-| Modelo | `backend/prisma/schema.prisma` → `User.theme`, `Theme` enum |
+| Tema (resolución, DOM) | `apps/panel/src/providers/ThemeProvider.tsx` |
+| Helpers tema | `apps/panel/src/lib/theme.ts` |
+| Toggle lateral | `apps/panel/src/components/layout/SidebarThemeToggle.tsx` |
+| Cuenta (formulario) | `apps/panel/src/features/profile/pages/ProfilePage.tsx` |
+| Estilos y variante `dark` | `apps/panel/src/index.css` |
+| Tipo de usuario (sesión) | `apps/panel/src/store/authStore.ts` |
+| API perfil (validación / actualización) | `apps/api/src/modules/profile/profile.schema.ts`, `profile.service.ts` |
+| Modelo | `apps/api/prisma/schema.prisma` → `User.theme`, `Theme` enum |
 
 ---
 
-*Última actualización: documentación alineada con el código bajo `jejeje/frontend` y `jejeje/backend` (enum `Theme`, `ThemeProvider`, Cuenta y `localStorage` `nc-theme`).*
+*Última actualización: documentación alineada con el código bajo `apps/panel` y `apps/api` (enum `Theme`, `ThemeProvider`, Cuenta y `localStorage` `nc-theme`).*

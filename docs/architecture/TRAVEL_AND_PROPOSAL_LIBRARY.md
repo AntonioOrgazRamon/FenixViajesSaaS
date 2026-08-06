@@ -1,6 +1,6 @@
 # Bibliotecas visual de viajes y propuestas
 
-Guía para demo, permisos y API interna (`jejeje`).
+Guía para demo, permisos y API interna (`apps/api`, `apps/panel`).
 
 ## Rutas SPA
 
