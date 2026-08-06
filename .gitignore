@@ -36,11 +36,11 @@ coverage/
 .nyc_output/
 
 # Archivos de extracción local
-saas_practicas_nakedcode/docx_content.txt
+docx_content.txt
 
-# PDFs locales de prueba (jejeje)
-jejeje/PDFs/
+# PDFs locales de prueba (api)
+apps/api/PDFs/
 
 # Uploads (local); versionar solo el directorio vacío
-saas_practicas_nakedcode/backend/uploads/*
-!saas_practicas_nakedcode/backend/uploads/.gitkeep
+apps/api/uploads/*
+!apps/api/uploads/.gitkeep
