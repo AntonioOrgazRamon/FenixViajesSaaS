@@ -397,7 +397,7 @@ export function TravelCatalogPage() {
           <p className="mt-1 max-w-2xl text-sm text-zinc-600 dark:text-zinc-500">
             Sube un PDF, procésalo para extraer viajes y consúltalos abajo. Documentación:{' '}
             <code className="rounded bg-zinc-200/80 px-1 text-xs text-zinc-800 dark:bg-white/10 dark:text-zinc-300">
-              saas_practicas_nakedcode/backend/docs/travel-catalog/MODULO_CATALOGO_VIAJES.md
+              docs/architecture/MODULO_CATALOGO_VIAJES.md
             </code>
             .
           </p>
