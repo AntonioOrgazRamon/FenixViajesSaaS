@@ -1,4 +1,4 @@
-# Fenix Viajes SaaS
+# SaaS
 
 Producto en **`saas_practicas_nakedcode/`**: API **Node.js + Express + Prisma (MySQL)** y SPA **Vite + React**.
 
