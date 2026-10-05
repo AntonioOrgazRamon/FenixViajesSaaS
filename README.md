@@ -39,7 +39,7 @@ cd apps/lead-capture-widget && npm install && npm start   # Widget en http://loc
 
 Guía completa (base de datos, variables de entorno): [`docs/development/SETUP_DB.md`](./docs/development/SETUP_DB.md).
 
-También puedes instalar `apps/api` y `apps/panel` desde la raíz gracias al workspace de npm (`npm install`); `apps/lead-capture-widget` mantiene su propio ciclo de instalación por separado (ver [`docs/architecture/`](./docs/architecture) si necesitas el motivo).
+También puedes instalar `apps/api` y `apps/panel` desde la raíz gracias al workspace de npm (`npm install`); `apps/lead-capture-widget` mantiene su propio ciclo de instalación por separado (el motivo está pendiente de confirmar: ver [T006 en las decisiones técnicas](./docs/architecture/DECISIONES_TECNICAS.md#t006--widget-fuera-del-workspace)).
 
 ---
 

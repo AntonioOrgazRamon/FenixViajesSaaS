@@ -23,7 +23,7 @@ Ver `apps/api/.env.example` (sección OpenAI). Valores por defecto en código: d
 ## Comandos
 
 ```bash
-cd backend
+cd apps/api
 npx prisma migrate deploy
 npx prisma generate
 npm run test:openai-guard
