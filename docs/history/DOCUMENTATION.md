@@ -1,5 +1,7 @@
 # Documentación del Sistema Backend SaaS
 
+> **Histórico (movido aquí el 2026-10-05)**: solo describe los módulos auth, companies, users, sessions y audit-logs; no incluye leads, catálogo, propuestas ni OpenAI. Lo que sigue vigente (prefijo `/api/v1`, `/health`, formato de error) está en `apps/api/AGENTS.md`. No es documentación viva.
+
 ## Arquitectura y Tecnologías
 El backend está construido con una arquitectura en capas (Controladores, Servicios, Repositorios) para asegurar la separación de responsabilidades y facilitar el mantenimiento.
 
