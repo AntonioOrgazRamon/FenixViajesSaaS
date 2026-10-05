@@ -1,21 +1,17 @@
-# Tareas pendientes
+# Configurar el envío de correo (recuperación de contraseña)
 
-Listado de lo que **falta por cerrar** en el producto, con prioridad a **autenticación y envío de correo** (recuperación de contraseña).
+Guía operativa. El estado de esta tarea vive en [TAREAS.md](./TAREAS.md); este documento solo explica cómo hacerla.
 
----
-
-## 1. Recuperación de contraseña y envío de correo (estado y pasos)
-
-### Qué ya está hecho (código)
+## Qué ya está hecho (código)
 
 - Flujo “He olvidado mi contraseña” en login, pantallas, API, tokens (SHA-256), política de contraseña, revocación de sesiones y auditoría.
 - Configuración en `apps/api/.env` de `EMAIL_FROM`, Gmail (`SMTP_HOST`, `SMTP_USER`, etc.). El remitente actual puede ser el que tengas puesto (p. ej. un Gmail dedicado a pruebas).
 
-### Qué falta para considerar **esta parte terminada** en un entorno real
+## Qué falta para considerar **esta parte terminada** en un entorno real
 
 El código envía el correo **solo si** el servidor puede autenticarse contra Gmail (u otro SMTP) con credenciales válidas. Hoy lo habitual es que **falte** la clave de aplicación o un buzón definitivo.
 
-#### Pasos exactos que quedan (en orden)
+### Pasos exactos que quedan (en orden)
 
 1. **Decidir el buzón emisor (recomendado para producción)**  
    - Opción A: un **Gmail nuevo** solo para la app (pruebas), con **verificación en dos pasos** activa.  
@@ -46,15 +42,7 @@ El código envía el correo **solo si** el servidor puede autenticarse contra Gm
 7. **Opcional (Windows)**  
    - Si `npx prisma generate` falla con `EPERM` al actualizar el motor de Prisma, cerrar procesos que bloqueen `node_modules` y volver a ejecutar el generate.
 
----
-
-## 2. Otras tareas (fuera de autenticación / correo)
-
-- Revisar la lista de issues o roadmap del producto (leads, viajes, superadmin, etc.) según prioridad de negocio.
-
----
-
-## Criterio de “acabado” para esta sección
+## Criterio de «acabado»
 
 Se puede dar por **cerrada la parte de contraseñas y correo** cuando:
 
@@ -62,7 +50,3 @@ Se puede dar por **cerrada la parte de contraseñas y correo** cuando:
 - El enlace caduca y es de un solo uso según lo implementado.  
 - Tras cambiar la contraseña, puede entrar con la nueva y las sesiones antiguas quedan invalidadas.  
 - En producción, el remitente y DNS/SMTP están alineados con vuestro dominio o política de correo.
-
----
-
-*Documento generado para el proyecto. Actualiza este archivo cuando cierres hitos o aparezcan nuevas dependencias.*
