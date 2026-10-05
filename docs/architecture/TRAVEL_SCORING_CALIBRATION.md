@@ -1,5 +1,7 @@
 # Calibración del scoring de recomendación (referencia)
 
+> ⚠️ **Desactualizado (auditoría 2026-10-05)**: este documento describe `rec-engine-v2.0.0`, pero el código usa `rec-engine-v2.1.0` (`apps/api/src/services/recommendation/constants.ts`). Los pesos de abajo no se han vuelto a verificar: la fuente de verdad es `scoring.engine.ts`.
+
 **Versión modelo:** `rec-engine-v2.0.0` (`SCORING_MODEL_VERSION`).
 
 Este documento describe los **pesos máximos por factor** en `scoreTripBreakdown` (`apps/api/src/services/recommendation/scoring.engine.ts`). No sustituye al código fuente.
