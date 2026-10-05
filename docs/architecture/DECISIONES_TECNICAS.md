@@ -17,6 +17,7 @@ Cada entrada cita la fuente de la que sale. `[A CONFIRMAR]` = motivo no document
 | T006 | `apps/lead-capture-widget` fuera del workspace de npm | Vigente |
 | T007 | `packages/contracts` nace como piloto con un solo contrato (`Role`) | Vigente |
 | T008 | Contexto para agentes de IA: `AGENTS.md` como única entrada | Vigente |
+| T009 | Los PDF de propuestas se sirven por enlace sin autenticación | Vigente [A CONFIRMAR] |
 
 ---
 
@@ -80,3 +81,16 @@ Cada entrada cita la fuente de la que sale. `[A CONFIRMAR]` = motivo no document
   - Memoria del agente fuera del repositorio como fuente de reglas: no la comparte el equipo y duplica lo que dice el repo.
   - Reglas en `.cursor/`: la carpeta está en `.gitignore`.
 - **Fuente**: auditoría de contexto del 2026-10-05.
+
+## T009 · PDF de propuestas por enlace, sin autenticación
+
+- **Decisión**: los PDF de propuestas se sirven por enlace sin autenticación; el control de acceso es el identificador aleatorio de la URL. Así el cliente final abre el PDF con el enlace, sin cuenta. `/uploads` se publica con `express.static` (`apps/api/src/index.ts:63`).
+- **Motivo**: que el cliente final abra la propuesta sin login [A CONFIRMAR: motivo tal como lo da el equipo; no está escrito en ninguna fuente del repositorio].
+- **Quién lo decidió**: [A CONFIRMAR].
+- **Comprobado solo leyendo el código (2026-10-05)**:
+  - El nombre del PDF es un UUID v4 aleatorio: `uuidv4()` en `modules/proposals/proposal.service.ts:233` (`pdfKey`) y en `modules/leads/smart-proposal.service.ts:590,705` (`versionId`). No es secuencial ni predecible. La ruta es `uploads/proposals/<companyId>/<uuid>.pdf`; `companyId` también es un UUID.
+  - No hay listado de directorio: no hay `serve-index` ni equivalente (`grep` en `apps/api/src` y `package.json`); `express.static` solo sirve archivos concretos.
+  - Los PDF de catálogo (`uploads/travel-pdfs/<companyId>/<uuid>.pdf`, `modules/travel/document.service.ts:57-61`) y los avatares (`uploads/avatars/<uuid>.<ext>`) también usan UUID v4 y cuelgan del mismo `/uploads`. Son documentos internos, no para el cliente final: si deben seguir así es [A CONFIRMAR].
+- **Consecuencias**: quien tenga el enlace accede; un enlace no caduca ni se puede revocar sin borrar el archivo, y puede quedar en correos, historiales o registros. La confidencialidad depende de que el UUID no se filtre.
+- **Descartado**: añadir login a `/uploads`; rompería el enlace para el cliente final. Está en «Ideas, no hacer» de [TAREAS.md](../development/TAREAS.md).
+- **Fuente**: lectura de código el 2026-10-05; sustituye al hallazgo H1 de la auditoría de contexto.

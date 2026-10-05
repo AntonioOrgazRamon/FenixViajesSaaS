@@ -47,13 +47,12 @@ No se resuelven en código ni aquí: se resuelven en [06_DECISIONS.md](../produc
 
 ## Hallazgos fuera de alcance
 
-Detectados en la auditoría de contexto del 2026-10-05. **No se arreglan salvo que una tarea lo pida expresamente.** Si una tarea arregla uno, se convierte en `- [ ]` en «Listo para hacer» y su fila se borra de esta tabla al cerrarla. H7 y H8 ya son tareas (ver arriba).
+Detectados en la auditoría de contexto del 2026-10-05. **No se arreglan salvo que una tarea lo pida expresamente.** Si una tarea arregla uno, se convierte en `- [ ]` en «Listo para hacer» y su fila se borra de esta tabla al cerrarla. H7 y H8 ya son tareas (ver arriba). H1 (`/uploads` sin login) dejó de ser un fallo: es la decisión T009 en [DECISIONES_TECNICAS.md](../architecture/DECISIONES_TECNICAS.md).
 
 Orden: H2 antes de tener clientes reales · H6 antes de incrustar el formulario en webs de clientes · H3, H4, H5 y H9 sin fecha.
 
 | ID | Hallazgo | Archivo:línea | Gravedad |
 |---|---|---|---|
-| H1 | `/uploads` se sirve sin autenticación: PDF de propuestas y de catálogo de todas las empresas (riesgo para D024) | `apps/api/src/index.ts:63`; URLs en `apps/api/src/modules/proposals/proposal.service.ts:250,274`; `apps/api/src/common/config/index.ts:63` | Alta |
 | H2 | Ninguna regla firme tiene test; `npm test` es un marcador de posición. Primero, tests de aislamiento por `companyId` | `apps/api/package.json:6` | Alta |
 | H3 | Borrar un lead o una empresa elimina en cascada las versiones de propuesta (D020) | `apps/api/prisma/schema.prisma:1169,1194,1217,1239` | Media |
 | H4 | El precio «congelado» de una versión solo vive en HTML/PDF; `ProposalTrip` apunta al viaje vivo | `apps/api/prisma/schema.prisma:1186-1189,1218` | Media |
@@ -71,3 +70,4 @@ Huecos detectados durante otras tareas. Se apuntan aquí en lugar de construirlo
 
 - Convertir `docs/history/qa-audit-output.txt` de UTF-16 (con CRLF) a UTF-8 para poder buscarlo con `grep`.
 - Comprobar si Cursor carga `AGENTS.md` (raíz y anidados) [A CONFIRMAR]; solo si alguien del equipo lo usa. Pasos: abrir la raíz en Cursor, chat de agente nuevo; preguntar sin herramientas por la primera fila de «Reglas firmes» (debe citar «Ningún dato de negocio cruza empresas…»); en otro chat, adjuntar `@apps/api/src/common/company-context.ts` y preguntar por el título de la sección sobre scripts de `apps/api/AGENTS.md` («Scripts peligrosos» si los anidados se cargan). Anotar versión y resultado y actualizar T008 en [DECISIONES_TECNICAS.md](../architecture/DECISIONES_TECNICAS.md).
+- No añadir login a `/uploads`: los PDF de propuestas se abren por enlace a propósito (T009 en [DECISIONES_TECNICAS.md](../architecture/DECISIONES_TECNICAS.md)).
