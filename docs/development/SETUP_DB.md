@@ -52,7 +52,7 @@ DATABASE_URL="mysql://saas_user:tu_clave@localhost:3306/saas_db"
 
 ## Pasos finales (cualquier entorno)
 
-Con `DATABASE_URL` correcta, desde la carpeta `backend`:
+Con `DATABASE_URL` correcta, desde la carpeta `apps/api`:
 
 ```bash
 npx prisma db push

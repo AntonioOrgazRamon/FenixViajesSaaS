@@ -27,7 +27,7 @@ Con flag **apagado**, el comportamiento es **Fase 1 sobre todo el catálogo APPR
 ## Cómo probar Fase 1
 
 ```bash
-cd backend
+cd apps/api
 # Sin híbrido (default si no pones env)
 npm run test:travel-search
 ```
@@ -48,7 +48,7 @@ TRAVEL_HYBRID_RETRIEVAL_ENABLED=false
 ## Comandos útiles
 
 ```bash
-cd backend
+cd apps/api
 npx prisma migrate deploy
 npx prisma migrate status
 npx prisma validate
@@ -59,7 +59,7 @@ npm run test:hybrid-retrieval   # pruebas parciales Fase 2 (p. ej. con DATABASE_
 ```
 
 ```bash
-cd frontend
+cd apps/panel
 npm run build
 ```
 

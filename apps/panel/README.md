@@ -1,73 +1,23 @@
-# React + TypeScript + Vite
+# apps/panel
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Panel interno de Fenix Viajes SaaS: la herramienta que usan comerciales y administradores de cada agencia para trabajar leads, catálogo y propuestas. Habla con `apps/api` por HTTP.
 
-Currently, two official plugins are available:
+**Stack**: React 19, Vite 5, TypeScript, Tailwind CSS v4, React Router 7, TanStack Query (estado de servidor), Zustand (sesión), React Hook Form + Zod, Axios.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Arrancar
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cp .env.example .env          # VITE_API_URL=http://localhost:3000/api/v1
+npm install                   # desde la raíz del monorepo (workspace)
+npm run dev -w apps/panel     # http://localhost:5173
+npm run build -w apps/panel   # tsc -b + vite build
+npm run lint -w apps/panel
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Estructura
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+`src/features/<área>` (app, auth, leads, profile, proposals, sessions, superadmin, system, travel, users), `src/components`, `src/routes`, `src/store`, `src/lib`, `src/providers`.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+Los tipos compartidos con el API (por ahora, `Role`) vienen de `@fenix/contracts` ([packages/contracts](../../packages/contracts)).
+
+Reglas y comandos para agentes de IA: [AGENTS.md](./AGENTS.md).

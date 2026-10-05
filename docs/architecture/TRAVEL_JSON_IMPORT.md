@@ -306,7 +306,7 @@ La vista previa lee **`normalizedJson.trip`** y **`normalizedJson.metadata.needs
 
 ```bash
 
-cd backend
+cd apps/api
 
 npm run qa:travel-json-import
 

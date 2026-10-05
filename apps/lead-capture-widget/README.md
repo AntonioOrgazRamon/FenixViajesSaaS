@@ -1,5 +1,7 @@
 # Demo Angular · captación de leads (viajes)
 
+> ⚠️ **Contradicción conocida (auditoría 2026-10-05)**: el README raíz presenta esta app como «formulario público embebible», pero hoy exige el JWT de un usuario de empresa y no usa el endpoint público `POST /api/v1/public/leads/form`. Ver hallazgo H6 en [TAREAS.md](../../docs/development/TAREAS.md).
+
 SPA **independiente** del frontend React del SaaS. Construye un `travelProfile` rico (duración, tags, preferidos, fechas, presupuesto con alcance) y envía `POST /api/v1/leads`.
 
 ## Configuración

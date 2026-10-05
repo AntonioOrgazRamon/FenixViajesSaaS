@@ -46,4 +46,18 @@ Para que este sistema no se degrade con el tiempo de la misma forma en que se de
 
 ## Estado de esta documentación
 
-Generada a partir de una auditoría técnica, una auditoría funcional y un ejercicio de descubrimiento de producto realizados sobre el estado del repositorio a fecha 2026-08-06. Contiene **25 decisiones registradas** (19 pendientes, 6 ya aprobadas y en vigor) y un catálogo de **70 casos límite** identificados. Es un punto de partida, no un documento cerrado — debe seguir creciendo con cada decisión nueva que se tome.
+Generada a partir de una auditoría técnica, una auditoría funcional y un ejercicio de descubrimiento de producto realizados sobre el estado del repositorio a fecha 2026-08-06. Es un punto de partida, no un documento cerrado — debe seguir creciendo con cada decisión nueva que se tome.
+
+### Recuento (se calcula, no se escribe a mano)
+
+Los totales no se copian en ningún documento porque caducan solos. Para obtenerlos, desde la raíz del repositorio:
+
+```bash
+grep -c '^# D[0-9]' docs/product/06_DECISIONS.md                  # decisiones registradas
+grep -c '^\*\*Estado\*\*: Pendiente' docs/product/06_DECISIONS.md  # pendientes
+grep -c '^\*\*Estado\*\*: Aprobada' docs/product/06_DECISIONS.md   # aprobadas
+grep -c '^\*\*Estado\*\*: Rechazada' docs/product/06_DECISIONS.md  # rechazadas
+grep -c '^[0-9]\+\. ' docs/product/05_EDGE_CASES.md                # casos límite
+```
+
+Para que el recuento sea correcto, cada decisión de 06 debe conservar el formato `# Dnnn` y la línea `**Estado**: <estado>`.

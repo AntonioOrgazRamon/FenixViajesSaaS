@@ -23,7 +23,7 @@ Formas de datos que cruzan la frontera HTTP entre `apps/api` y sus consumidores:
 
 ## Quién puede depender de este paquete
 
-`apps/api`, `apps/panel`, `apps/lead-capture-widget`. Nadie más — y este paquete, a su vez, no debe depender nunca de ninguna `apps/*` (ver `docs/architecture/` para la regla completa de dependencias del monorepo).
+`apps/api`, `apps/panel`, `apps/lead-capture-widget`. Nadie más — y este paquete, a su vez, no debe depender nunca de ninguna `apps/*` (ver [T007 en las decisiones técnicas](../../docs/architecture/DECISIONES_TECNICAS.md#t007--packagescontracts-como-piloto)).
 
 ## Estado de adopción
 

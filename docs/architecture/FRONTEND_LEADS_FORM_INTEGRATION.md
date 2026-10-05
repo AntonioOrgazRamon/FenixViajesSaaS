@@ -1,5 +1,7 @@
 # Integracion frontend - formulario publico de leads
 
+> ⚠️ **Contradicción conocida (auditoría 2026-10-05)**: este documento describe el endpoint público `POST /api/v1/public/leads/form`, pero `apps/lead-capture-widget` no lo usa: envía `POST /api/v1/leads` con un JWT pegado a mano. Ver hallazgo H6 en [TAREAS.md](../development/TAREAS.md).
+
 Guia para el equipo frontend sobre como enviar formularios publicos al sistema interno de leads.
 
 ---

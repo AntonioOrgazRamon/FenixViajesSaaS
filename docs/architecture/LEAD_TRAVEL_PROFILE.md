@@ -67,7 +67,7 @@ Sección **“Datos clave del viaje (negocio)”** en `proposal-html-template.ts
 ## QA
 
 ```bash
-cd backend
+cd apps/api
 npm run qa:lead-travel-profile
 ```
 

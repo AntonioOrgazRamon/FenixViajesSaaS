@@ -1,5 +1,7 @@
 # Visión general del proyecto (MVP SaaS multiempresa)
 
+> **Histórico (movido aquí el 2026-10-05)**: solo describe los módulos auth, companies, users, sessions y audit-logs; no incluye leads, catálogo, propuestas ni OpenAI. Lo que sigue vigente (prefijo `/api/v1`, `/health`, formato de error) está en `apps/api/AGENTS.md`. No es documentación viva.
+
 Documento de referencia técnica-resumida del estado del repositorio: API en `apps/api/`, SPA en `apps/panel/`, datos y despliegue local.
 
 ---
