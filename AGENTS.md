@@ -1,6 +1,6 @@
 # AGENTS.md — Fenix Viajes SaaS
 
-Entrada para agentes de IA (Claude Code, Cursor…). Se carga en **cada** sesión: ≤ 150 líneas / ~2.500 tokens. Lo que no cabe se enlaza, no se copia. `[A CONFIRMAR]` = sin verificar, no es un hecho.
+Entrada para agentes de IA (Claude Code, Cursor…). Se carga en **cada** sesión: ≤ 150 líneas / ≤ 4.500 tokens (medido). Lo que no cabe se enlaza, no se copia. `[A CONFIRMAR]` = sin verificar, no es un hecho.
 
 ## Paso 0 · al empezar cada sesión
 1. Este archivo ya está cargado. Si vas a trabajar en una carpeta con su propio `AGENTS.md`, léelo.
@@ -101,5 +101,5 @@ Una tarea está hecha solo si:
 | Algo propio de una app | El `AGENTS.md` de esa carpeta |
 | Un documento que deja de ser vivo | Muévelo a docs/history/ |
 
-**Presupuesto de contexto**: esta raíz ≤ 2.500 tokens; cada `AGENTS.md` de carpeta ≤ 700. Mídelo con `wc -c AGENTS.md apps/*/AGENTS.md packages/*/AGENTS.md` (caracteres ÷ 3,6 ≈ tokens).
+**Presupuesto de contexto**: esta raíz ≤ 4.500 tokens (2026-10-05: 4,2k); cada `AGENTS.md` de carpeta ≤ 1.300. Medida válida: `/context` (sección «Memory files»). Estimación rápida: `wc -c` ÷ 2,1 (÷ 3,6 subestima ~40%).
 **Auditoría periódica** (al cerrar cada bloque de trabajo y como mínimo una vez al mes): rutas y comandos de este archivo siguen existiendo · línea base actualizada · presupuesto respetado · enlaces sin romper · TAREAS.md sin tareas `[x]` sin evidencia.
