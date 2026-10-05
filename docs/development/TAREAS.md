@@ -23,6 +23,12 @@ Reglas:
 - [ ] Configurar un SMTP real para la recuperación de contraseña: buzón emisor, contraseña de aplicación y `.env` del despliegue. Cómo hacerlo: [SETUP_EMAIL.md](./SETUP_EMAIL.md).
 - [ ] Revisar la lista «Fuera hoy» de la sección Alcance de `AGENTS.md` (reservas, pagos, facturación, postventa), marcada `[A CONFIRMAR]`.
 - [ ] Confirmar por qué `apps/lead-capture-widget` está fuera del workspace de npm (ver T006 en [DECISIONES_TECNICAS.md](../architecture/DECISIONES_TECNICAS.md)).
+- [ ] Comprobar si Cursor carga `AGENTS.md` (raíz y anidados) [A CONFIRMAR]. Lo tiene que hacer una persona con Cursor, en la rama que contiene estos archivos:
+  1. Abrir la carpeta raíz del repositorio en Cursor (no una subcarpeta) y abrir un **chat de agente nuevo** (`Ctrl+L` / `Cmd+L`, «New chat»).
+  2. **Raíz**: sin adjuntar nada, enviar: «Sin usar herramientas: ¿tienes cargadas instrucciones de un AGENTS.md? Si es así, copia literalmente la primera fila de la tabla de "Reglas firmes"». Resultado esperado: cita la fila «Ningún dato de negocio cruza empresas…».
+  3. **Anidado (control)**: en el mismo chat, enviar: «Sin usar herramientas: ¿tienes instrucciones de apps/api/AGENTS.md? Si es así, cita el título de su sección sobre scripts». Lo esperado es NO, porque aún no se ha tocado `apps/api`.
+  4. **Anidado (prueba)**: en un chat nuevo, adjuntar `@apps/api/src/common/company-context.ts`, pedir «Resume este archivo en una línea» y después repetir la pregunta del paso 3. Si responde «Scripts peligrosos», Cursor carga los `AGENTS.md` anidados al trabajar en esa carpeta.
+  5. Anotar aquí la versión de Cursor y el resultado de los pasos 2 a 4, y actualizar T008 en [DECISIONES_TECNICAS.md](../architecture/DECISIONES_TECNICAS.md). Si Cursor no carga los anidados, abrir la decisión de cómo cubrirlo.
 - [ ] Decisiones de producto pendientes D001–D019: se resuelven en [06_DECISIONS.md](../product/06_DECISIONS.md), no aquí.
 
 ## Hallazgos fuera de alcance
