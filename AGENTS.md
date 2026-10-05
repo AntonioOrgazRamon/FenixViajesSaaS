@@ -1,6 +1,6 @@
 # AGENTS.md — Fenix Viajes SaaS
 
-Punto de entrada para agentes de IA (Claude Code, Cursor…). Se carga en **cada** sesión: máximo 150 líneas / ~2.500 tokens. Lo que no cabe aquí se enlaza, no se copia. `[A CONFIRMAR]` = dato sin verificar, no es un hecho.
+Entrada para agentes de IA (Claude Code, Cursor…). Se carga en **cada** sesión: ≤ 150 líneas / ~2.500 tokens. Lo que no cabe se enlaza, no se copia. `[A CONFIRMAR]` = sin verificar, no es un hecho.
 
 ## Paso 0 · al empezar cada sesión
 1. Este archivo ya está cargado. Si vas a trabajar en una carpeta con su propio `AGENTS.md`, léelo.
@@ -21,7 +21,7 @@ CRM multiempresa para agencias de viajes: captación y cualificación de leads, 
 | `packages/contracts` | Tipos compartidos del contrato HTTP (piloto: solo `Role`) | TypeScript |
 
 ## Reglas firmes (invariantes)
-La autoridad es [docs/product/06_DECISIONS.md](docs/product/06_DECISIONS.md). La última columna dice con franqueza qué protege cada regla hoy.
+Autoridad: [docs/product/06_DECISIONS.md](docs/product/06_DECISIONS.md). La última columna dice qué protege de verdad cada regla hoy.
 
 | Regla | Dónde se define | Dónde vive en el código | Cómo se comprueba hoy |
 |---|---|---|---|
@@ -48,19 +48,20 @@ npm install                                        # api, panel, contracts
 (cd apps/lead-capture-widget && npm install)       # widget: npm aparte
 npm run dev -w apps/api                            # :3000 — requiere apps/api/.env (ver .env.example) y MySQL
 npm run dev -w apps/panel                          # :5173
-npx tsc --noEmit -p apps/api                       # tipos del API
+npm run verify                                     # «hecho» mínimo: tipos API + build panel + lint ≤ techo
+npm run typecheck:api                              # solo tipos del API
 npm run build -w apps/panel                        # tsc -b + vite build
 npm run lint -w apps/panel
 npm run test:segments -w apps/api                  # y el resto de test:* (ver apps/api/AGENTS.md)
 ```
-Base de datos: [docs/development/SETUP_DB.md](docs/development/SETUP_DB.md). Los `test:*` validan `DATABASE_URL` al arrancar aunque no se conecten.
+BD: [docs/development/SETUP_DB.md](docs/development/SETUP_DB.md). Los `test:*` exigen `DATABASE_URL` aunque no se conecten.
 
 **Línea base conocida (2026-10-05)**: tipos del API 0 errores · build del panel OK · lint del panel **37 errores / 3 avisos** · `test:travel-search` **falla** · el API no tiene `build` ni `start` · no hay CI.
 
 ## Definición de «hecho»
 Una tarea está hecha solo si:
-1. `npx tsc --noEmit -p apps/api` da 0 errores y `npm run build -w apps/panel` pasa (si tocaste esa app).
-2. El lint del panel no empeora la línea base.
+1. `npm run verify` pasa: tipos del API sin errores, build del panel y lint del panel ≤ 37 errores (techo en `scripts/lint-ceiling.mjs`; si bajas los errores, baja el techo en el mismo commit).
+2. Si tocaste el widget: `npm run build` en `apps/lead-capture-widget`.
 3. Los `test:*` relacionados con el cambio pasan; nómbralos.
 4. La documentación afectada está actualizada en el mismo commit (ver «Mantenimiento»).
 5. En TAREAS.md se marca `[x]` con evidencia: hash del commit, comando ejecutado y resultado. **Sin evidencia, no está hecha.**
@@ -82,13 +83,13 @@ Una tarea está hecha solo si:
 | Tocar un caso «¿y si…?» | [docs/product/05_EDGE_CASES.md](docs/product/05_EDGE_CASES.md) |
 | Priorizar trabajo de producto | [docs/product/07_PRODUCT_ROADMAP.md](docs/product/07_PRODUCT_ROADMAP.md) |
 | Ver o actualizar tareas | [docs/development/TAREAS.md](docs/development/TAREAS.md) |
-| Tocar recomendación o puntuación | docs/architecture/RECOMMENDATION_ENGINE_STATUS.md, TRAVEL_SCORING_CALIBRATION.md |
+| Tocar recomendación | docs/architecture/RECOMMENDATION_ENGINE_STATUS.md, TRAVEL_SCORING_CALIBRATION.md |
 | Tocar importación de catálogo | docs/architecture/MODULO_CATALOGO_VIAJES.md, TRAVEL_JSON_IMPORT.md |
 | Tocar geo, media o perfil de lead | docs/architecture/TRAVEL_GEO_MODEL.md, TRAVEL_MEDIA_ENRICHMENT.md, LEAD_TRAVEL_PROFILE.md |
 | Tocar propuestas (modelo de datos) | docs/architecture/travel-proposals-data-model.md, TRAVEL_AND_PROPOSAL_LIBRARY.md |
 | Tocar IA o costes | docs/architecture/OPENAI_USAGE_GUARD.md, OPENAI_DEPENDENCY_MATRIX.md |
-| Montar la BD o el correo | docs/development/SETUP_DB.md, SETUP_EMAIL.md |
-| Ver por qué algo se hizo así en el pasado | docs/history/ (instantáneas cerradas; **no** son documentación viva) |
+| Montar BD o correo | docs/development/SETUP_DB.md, SETUP_EMAIL.md |
+| Ver el pasado | docs/history/ (instantáneas; **no** es documentación viva) |
 
 ## Mantenimiento
 | Cuando cambie… | Actualiza |

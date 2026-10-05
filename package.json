@@ -8,6 +8,8 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present"
+    "lint": "npm run lint --workspaces --if-present",
+    "verify": "npm run typecheck:api && npm run build -w apps/panel && node scripts/lint-ceiling.mjs",
+    "typecheck:api": "npm exec -w apps/api -- tsc --noEmit -p ."
   }
 }

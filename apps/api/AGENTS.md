@@ -8,8 +8,8 @@ Se carga solo al trabajar aquí. Reglas firmes y «hecho»: [AGENTS.md raíz](..
 - `src/modules/<módulo>`: controller, service, `*.schema.ts` (Zod) y `*.routes.ts`.
 - `src/services/{geo,leads,openai,proposals,recommendation,travel}`: lógica de dominio compartida entre módulos.
 - `src/common`: `config` (valida el entorno con Zod al cargar: sin `DATABASE_URL` no arranca nada, ni los scripts), `company-context.ts`, `middlewares` (`requireAuth`, `requireRole`, `requireCompanyMember`), `errors`.
-- Errores normalizados: `{ success: false, error: { code, message } }`.
-- `prisma/schema.prisma` es la fuente del modelo. Los `.sql` sueltos son copias que pueden divergir (hallazgo H13).
+- Errores: `{ success: false, error: { code, message } }`.
+- Fuente del modelo: `prisma/schema.prisma` (los `.sql` sueltos pueden divergir, H13).
 
 ## Al tocar código aquí
 - Rutas de negocio: `requireAuth` + `requireRole` y la empresa con `resolveTenantCompanyId(req)` (o `req.user.companyId` tras `requireCompanyMember`). Nunca la empresa que mande el cliente sin validarla (`assertPasteImportCompanyScope`).
@@ -19,7 +19,7 @@ Se carga solo al trabajar aquí. Reglas firmes y «hecho»: [AGENTS.md raíz](..
 
 ## Verificación
 ```bash
-npx tsc --noEmit -p apps/api
+npm run typecheck:api                                                       # desde la raíz
 DATABASE_URL="mysql://x:x@127.0.0.1:1/none" npm run <script> -w apps/api   # scripts sin BD real
 ```
 - **Sin BD** (pasan con la URL ficticia): `test:hotels`, `test:segments`, `test:index-coverage`, `test:catalog-pipeline`, `test:candidate-quality`, `test:title-repair`, `test:hybrid-retrieval`. `test:travel-search` falla hoy (H5).
