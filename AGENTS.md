@@ -43,7 +43,7 @@ Los `test:*` exigen `DATABASE_URL` aunque no se conecten.
 **Línea base (2026-10-05)**: tipos API 0 errores · build panel OK · lint panel **37 errores / 3 avisos** · `test:travel-search` **falla** · API sin `build`/`start` · sin CI.
 
 ## Definición de «hecho»
-1. `npm run verify` pasa (si bajas errores de lint, baja el techo de `scripts/lint-ceiling.mjs` en el mismo commit).
+1. `npm run verify` pasa. El techo de lint (37, `scripts/lint-ceiling.mjs`) **solo baja**: si corriges errores, bájalo en el mismo commit; nunca lo subas para que pase un cambio.
 2. Los `test:*` relacionados (y el de la app que toques, ver su `AGENTS.md`) pasan; nómbralos.
 3. Docs afectadas actualizadas en el mismo commit.
 4. En TAREAS.md, `[x]` solo con evidencia: commit, comando y resultado. **Sin evidencia, no está hecha.**

@@ -1,5 +1,6 @@
-// Lint del panel con techo: falla si hay más errores que la línea base.
-// Línea base: AGENTS.md («Línea base conocida»). Si la bajas, baja también MAX_ERRORS.
+// Lint del panel con techo: falla si hay más errores que la línea base (AGENTS.md, «Línea base»).
+// El techo SOLO BAJA: si se corrigen errores de lint, MAX_ERRORS se baja en el mismo commit.
+// Nunca se sube para dejar pasar un cambio.
 import { spawnSync } from 'node:child_process';
 
 const MAX_ERRORS = 37;
