@@ -16,7 +16,7 @@ Autoridad: docs/product/06_DECISIONS.md (D…) y docs/architecture/DECISIONES_TE
 
 | Regla | Definida en | Código | Cómo se comprueba hoy |
 |---|---|---|---|
-| Ningún dato de negocio cruza empresas | D024 | `common/company-context.ts`, `requireCompany.ts`; `companyId` en tablas | Solo revisión de código. Sin test. Sin políticas en la BD. ⚠️ `/uploads` se sirve sin autenticación (TAREAS.md, hallazgo H1). |
+| Ningún dato de negocio cruza empresas | D024 | `common/company-context.ts`, `requireCompany.ts`; `companyId` en tablas | Solo revisión de código. Sin test. Sin políticas en la BD. PDF accesibles por enlace con identificador no adivinable (T009). |
 | SUPER_ADMIN indica siempre la empresa | 03 | `resolveTenantCompanyId` | Solo revisión de código. Sin test. |
 | Cada generación de propuesta crea versión nueva; nunca sobrescribe | D020 | `smart-proposal.service.ts`; `@@unique` en `schema.prisma` | Constraint de unicidad. Sin test. Nada impide borrar en cascada. |
 | Solo viajes `APPROVED` en búsqueda, recomendación y propuestas | D022 | filtros `status: 'APPROVED'` en `services/` | Solo revisión de código. Sin test. Los scripts `travel-auto-approve*` saltan la revisión humana. |
@@ -51,7 +51,7 @@ Los `test:*` exigen `DATABASE_URL` aunque no se conecten.
 ## Convenciones
 - Un commit por tarea (Conventional Commits). Dominio y docs en español; código en inglés.
 - **Ideas, no hacer**: un hueco fuera de tu tarea se apunta en TAREAS.md § «Ideas, no hacer»; no se construye.
-- Los hallazgos de TAREAS.md (H1, H2…) no se arreglan salvo que la tarea lo pida expresamente.
+- Los hallazgos de TAREAS.md (H2, H3…) no se arreglan salvo que la tarea lo pida expresamente.
 
 ## Cuándo abrir cada archivo
 | Si vas a… | Abre |
