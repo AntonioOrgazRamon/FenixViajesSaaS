@@ -72,7 +72,7 @@ Cada entrada cita la fuente de la que sale. `[A CONFIRMAR]` = motivo no document
 ## T008 · Contexto para agentes de IA
 
 - **Decisión**: `AGENTS.md` en la raíz es la única entrada común para Claude Code, Cursor y otras herramientas. `CLAUDE.md` solo lo importa (`@AGENTS.md`). Cada app o paquete tiene su `AGENTS.md`, más un `CLAUDE.md` que lo importa y se carga solo al trabajar en esa carpeta. Los documentos de producto se **enlazan**, no se importan. El estado de las tareas vive solo en `docs/development/TAREAS.md`.
-- **Motivo**: que cada sesión empiece conociendo las reglas firmes, con un coste medido con `/context` (4,2k tokens siempre cargados el 2026-10-05; presupuesto ≤ 4.500) y una sola fuente de verdad por tema.
+- **Motivo**: que cada sesión empiece conociendo las reglas firmes, con un coste medido con `/context` (2,6k tokens siempre cargados el 2026-10-05, tras recortar de 4,2k; presupuesto ≤ 2.700) y una sola fuente de verdad por tema.
 - **Descartado**:
   - Varios archivos de estado que haya que sincronizar a mano: se contradicen cuando uno se retrasa.
   - Porcentajes de avance escritos a mano: caducan solos. Se usan recuentos con `grep`.
